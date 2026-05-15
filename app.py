@@ -1,15 +1,17 @@
-# app.py  v2.0
-# UIフルリニューアル：ヘッダー・ダークモード・カード強化
+# app.py  v2.1
+# 追加機能：グラフ（棒・円）＋ コピーボタン
 
 import streamlit as st
 import pandas as pd
 import datetime
 import json
 import time
+import plotly.graph_objects as go
+import plotly.express as px
 from analyzer import get_client, analyze_keyword_structured
 
 # =====================================
-# ページ設定（必ず最初に書く）
+# ページ設定
 # =====================================
 st.set_page_config(
     page_title="🎯 AIキーワード分析ツール",
@@ -19,20 +21,15 @@ st.set_page_config(
 )
 
 # =====================================
-# カスタムCSS（全デザインの核心）
+# カスタムCSS
 # =====================================
 st.markdown("""
 <style>
-/* =====================
-   基本リセット・フォント
-   ===================== */
 html, body, [class*="css"] {
   font-family: 'Hiragino Sans', 'Yu Gothic UI', 'Meiryo', sans-serif;
 }
 
-/* =====================
-   ヘッダーバナー
-   ===================== */
+/* ヒーローバナー */
 .hero-banner {
   background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #06b6d4 100%);
   border-radius: 16px;
@@ -48,14 +45,6 @@ html, body, [class*="css"] {
   top: -40px; right: -40px;
   width: 200px; height: 200px;
   background: rgba(255,255,255,0.08);
-  border-radius: 50%;
-}
-.hero-banner::after {
-  content: '';
-  position: absolute;
-  bottom: -60px; left: 30%;
-  width: 280px; height: 280px;
-  background: rgba(255,255,255,0.05);
   border-radius: 50%;
 }
 .hero-title {
@@ -78,17 +67,12 @@ html, body, [class*="css"] {
   padding: 3px 12px;
   font-size: 12px;
   margin-bottom: 12px;
-  backdrop-filter: blur(4px);
 }
 
-/* =====================
-   タブナビゲーション
-   ===================== */
+/* タブ */
 .stTabs [data-baseweb="tab-list"] {
   gap: 8px;
-  background: transparent;
   border-bottom: 2px solid #e2e8f0;
-  padding-bottom: 0;
 }
 .stTabs [data-baseweb="tab"] {
   border-radius: 8px 8px 0 0;
@@ -103,12 +87,9 @@ html, body, [class*="css"] {
 .stTabs [aria-selected="true"] {
   background: white !important;
   color: #6366f1 !important;
-  border-color: #e2e8f0 !important;
 }
 
-/* =====================
-   メトリクスカード
-   ===================== */
+/* メトリクスカード */
 [data-testid="metric-container"] {
   background: white;
   border: 1px solid #e8eaf0;
@@ -121,31 +102,21 @@ html, body, [class*="css"] {
   transform: translateY(-2px);
   box-shadow: 0 4px 16px rgba(0,0,0,0.10);
 }
-[data-testid="metric-container"] [data-testid="stMetricValue"] {
-  font-size: 26px;
-  font-weight: 800;
-  color: #1e293b;
-}
 
-/* =====================
-   価格帯バッジ
-   ===================== */
+/* バッジ */
 .badge {
   display: inline-block;
   padding: 4px 14px;
   border-radius: 20px;
   font-size: 12px;
   font-weight: 700;
-  letter-spacing: 0.3px;
 }
 .badge-budget   { background:#d1fae5; color:#065f46; }
 .badge-standard { background:#dbeafe; color:#1e40af; }
 .badge-premium  { background:#ede9fe; color:#5b21b6; }
 .badge-luxury   { background:#1f2937; color:#f9fafb; }
 
-/* =====================
-   キーワードカード
-   ===================== */
+/* キーワードカード */
 .kw-card {
   background: white;
   border-radius: 16px;
@@ -164,9 +135,6 @@ html, body, [class*="css"] {
   font-weight: 700;
   color: #1e293b;
   margin-bottom: 12px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
 }
 .kw-meta {
   display: flex;
@@ -183,9 +151,7 @@ html, body, [class*="css"] {
   color: #475569;
 }
 
-/* =====================
-   購買意欲スコアバー
-   ===================== */
+/* スコアバー */
 .score-wrap { margin: 12px 0; }
 .score-label {
   font-size: 12px;
@@ -203,12 +169,9 @@ html, body, [class*="css"] {
 .score-fill {
   height: 8px;
   border-radius: 99px;
-  transition: width 0.6s ease;
 }
 
-/* =====================
-   広告文カード
-   ===================== */
+/* 広告文グリッド */
 .ad-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -220,7 +183,7 @@ html, body, [class*="css"] {
   border: 1px solid #e0e7ff;
   border-top: 3px solid #6366f1;
   border-radius: 10px;
-  padding: 14px 16px;
+  padding: 14px 16px 48px;   /* 下にコピーボタン分のスペース */
   position: relative;
 }
 .ad-num {
@@ -243,9 +206,13 @@ html, body, [class*="css"] {
   line-height: 1.6;
 }
 
-/* =====================
-   アドバイスボックス
-   ===================== */
+/* コピーボタン */
+.copy-btn-wrap {
+  position: absolute;
+  bottom: 10px; right: 10px;
+}
+
+/* アドバイスボックス */
 .advice-box {
   background: linear-gradient(135deg, #fffbeb, #fef3c7);
   border: 1px solid #fcd34d;
@@ -258,9 +225,17 @@ html, body, [class*="css"] {
   line-height: 1.6;
 }
 
-/* =====================
-   セクション見出し
-   ===================== */
+/* グラフセクション */
+.chart-card {
+  background: white;
+  border-radius: 16px;
+  padding: 24px;
+  border: 1px solid #e8eaf0;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  margin-bottom: 16px;
+}
+
+/* セクション見出し */
 .section-title {
   font-size: 18px;
   font-weight: 700;
@@ -270,9 +245,7 @@ html, body, [class*="css"] {
   border-left: 4px solid #6366f1;
 }
 
-/* =====================
-   サイドバー
-   ===================== */
+/* サイドバー */
 [data-testid="stSidebar"] {
   background: #1e293b !important;
 }
@@ -285,23 +258,8 @@ html, body, [class*="css"] {
   color: #f1f5f9 !important;
   border-radius: 8px;
 }
-[data-testid="stSidebar"] hr {
-  border-color: #334155 !important;
-}
 
-/* =====================
-   ダウンロードボタン
-   ===================== */
-.stDownloadButton button {
-  border-radius: 10px !important;
-  font-weight: 600 !important;
-  padding: 10px 20px !important;
-  transition: all 0.2s !important;
-}
-
-/* =====================
-   スマホ対応
-   ===================== */
+/* スマホ対応 */
 @media (max-width: 768px) {
   .hero-title { font-size: 20px; }
   .hero-banner { padding: 24px 20px; }
@@ -312,7 +270,7 @@ html, body, [class*="css"] {
 
 
 # =====================================
-# 定数定義
+# 定数
 # =====================================
 SEGMENT_INFO = {
     "Budget": {
@@ -352,7 +310,6 @@ INTENT_EMOJI = {
     "価格調査":     "💰",
 }
 
-
 # =====================================
 # APIキー取得
 # =====================================
@@ -362,12 +319,117 @@ if hasattr(st, "secrets"):
 
 
 # =====================================
+# グラフ生成関数
+# =====================================
+def make_score_bar_chart(valid: list) -> go.Figure:
+    """購買意欲スコアの横棒グラフ"""
+    keywords = [r.get("keyword", "")[:15] for r in valid]
+    scores   = [r.get("purchase_score", 0) for r in valid]
+    segs     = [r.get("price_segment", "Standard") for r in valid]
+    colors   = [SEGMENT_INFO.get(s, SEGMENT_INFO["Standard"])["color"] for s in segs]
+
+    fig = go.Figure(go.Bar(
+        x=scores,
+        y=keywords,
+        orientation="h",
+        marker=dict(color=colors, line=dict(width=0)),
+        text=[f"{s}点" for s in scores],
+        textposition="outside",
+        hovertemplate="<b>%{y}</b><br>購買意欲: %{x}/10<extra></extra>",
+    ))
+    fig.update_layout(
+        title=dict(text="📈 購買意欲スコア比較", font=dict(size=15, color="#1e293b")),
+        xaxis=dict(range=[0, 11], title="購買意欲スコア", tickfont=dict(size=11)),
+        yaxis=dict(title="", tickfont=dict(size=11), autorange="reversed"),
+        plot_bgcolor="white",
+        paper_bgcolor="white",
+        margin=dict(l=20, r=60, t=50, b=30),
+        height=max(300, len(valid) * 44),
+        showlegend=False,
+    )
+    fig.update_xaxes(showgrid=True, gridcolor="#f1f5f9", zeroline=False)
+    fig.update_yaxes(showgrid=False)
+    return fig
+
+
+def make_segment_pie_chart(seg_counts: dict) -> go.Figure:
+    """価格帯別の円グラフ"""
+    labels = []
+    values = []
+    colors = []
+    for seg, count in seg_counts.items():
+        if count > 0:
+            labels.append(f"{SEGMENT_INFO[seg]['emoji']} {seg}")
+            values.append(count)
+            colors.append(SEGMENT_INFO[seg]["color"])
+
+    fig = go.Figure(go.Pie(
+        labels=labels,
+        values=values,
+        marker=dict(colors=colors, line=dict(color="white", width=2)),
+        textinfo="label+percent",
+        textfont=dict(size=13),
+        hole=0.45,
+        hovertemplate="<b>%{label}</b><br>%{value}件（%{percent}）<extra></extra>",
+    ))
+    fig.update_layout(
+        title=dict(text="🎯 価格帯別 分布", font=dict(size=15, color="#1e293b")),
+        plot_bgcolor="white",
+        paper_bgcolor="white",
+        margin=dict(l=20, r=20, t=50, b=20),
+        height=320,
+        showlegend=True,
+        legend=dict(orientation="v", x=1.0, y=0.5),
+    )
+    return fig
+
+
+def make_intent_bar_chart(valid: list) -> go.Figure:
+    """検索意図別の件数グラフ"""
+    intent_counts = {}
+    for r in valid:
+        intent = r.get("search_intent", "不明")
+        intent_counts[intent] = intent_counts.get(intent, 0) + 1
+
+    labels = [f"{INTENT_EMOJI.get(k,'🔎')} {k}" for k in intent_counts]
+    values = list(intent_counts.values())
+    colors_map = {
+        "比較検討段階": "#6366f1",
+        "購買直前":     "#10b981",
+        "情報収集":     "#f59e0b",
+        "価格調査":     "#ef4444",
+    }
+    bar_colors = [colors_map.get(k, "#94a3b8") for k in intent_counts]
+
+    fig = go.Figure(go.Bar(
+        x=labels,
+        y=values,
+        marker=dict(color=bar_colors, line=dict(width=0)),
+        text=values,
+        textposition="outside",
+        hovertemplate="<b>%{x}</b><br>%{y}件<extra></extra>",
+    ))
+    fig.update_layout(
+        title=dict(text="🔍 検索意図別 件数", font=dict(size=15, color="#1e293b")),
+        xaxis=dict(title="", tickfont=dict(size=12)),
+        yaxis=dict(title="件数", tickfont=dict(size=11), dtick=1),
+        plot_bgcolor="white",
+        paper_bgcolor="white",
+        margin=dict(l=20, r=20, t=50, b=30),
+        height=300,
+        showlegend=False,
+    )
+    fig.update_yaxes(showgrid=True, gridcolor="#f1f5f9", zeroline=False)
+    fig.update_xaxes(showgrid=False)
+    return fig
+
+
+# =====================================
 # サイドバー
 # =====================================
 with st.sidebar:
     st.markdown("### 🎯 AI分析ツール")
     st.markdown("---")
-
     if not api_key:
         st.markdown("**🔑 APIキー設定**")
         api_key = st.text_input(
@@ -385,7 +447,7 @@ with st.sidebar:
     st.markdown("""
 1. キーワードを入力（1行1つ）
 2. 「分析開始」をクリック
-3. 結果を確認・絞り込み
+3. 結果・グラフを確認
 4. CSVでダウンロード
 """)
     st.markdown("---")
@@ -393,13 +455,12 @@ with st.sidebar:
     for seg, info in SEGMENT_INFO.items():
         st.markdown(f"{info['emoji']} **{seg}**  \n{info['strategy']}")
         st.markdown("")
-
     st.markdown("---")
-    st.caption("v2.0 | Powered by OpenAI")
+    st.caption("v2.1 | Powered by OpenAI")
 
 
 # =====================================
-# ヒーローバナー（ヘッダー）
+# ヒーローバナー
 # =====================================
 st.markdown("""
 <div class="hero-banner">
@@ -414,11 +475,12 @@ st.markdown("""
 
 
 # =====================================
-# タブナビゲーション
+# タブ
 # =====================================
-tab_analyze, tab_result, tab_guide = st.tabs([
+tab_analyze, tab_result, tab_chart, tab_guide = st.tabs([
     "🔍 キーワード分析",
-    "📊 分析結果",
+    "📝 分析結果",
+    "📊 グラフ分析",
     "📖 使い方ガイド",
 ])
 
@@ -427,7 +489,6 @@ tab_analyze, tab_result, tab_guide = st.tabs([
 # タブ①：キーワード分析
 # =====================================
 with tab_analyze:
-
     col_input, col_btn = st.columns([3, 1])
 
     with col_input:
@@ -452,7 +513,6 @@ with tab_analyze:
         kw_list = [k.strip() for k in keywords_input.strip().splitlines() if k.strip()]
         st.info(f"入力数：**{len(kw_list)}件**")
 
-    # ---- 分析実行 ----
     if run_button:
         if not api_key:
             st.error("⚠️ サイドバーにAPIキーを入力してください。")
@@ -480,7 +540,7 @@ with tab_analyze:
             time.sleep(0.5)
 
         progress.empty()
-        status.success(f"✅ {len(kw_list)}件の分析が完了！「📊 分析結果」タブを確認してください。")
+        status.success(f"✅ {len(kw_list)}件の分析完了！「📝 分析結果」「📊 グラフ分析」タブを確認してください。")
         st.session_state["results"] = results
 
 
@@ -488,9 +548,8 @@ with tab_analyze:
 # タブ②：分析結果
 # =====================================
 with tab_result:
-
     if "results" not in st.session_state:
-        st.info("👈 「🔍 キーワード分析」タブでキーワードを入力して分析してください。")
+        st.info("👈 「🔍 キーワード分析」タブで分析してください。")
         st.stop()
 
     results = st.session_state["results"]
@@ -500,7 +559,7 @@ with tab_result:
         st.error("有効な分析結果がありません。")
         st.stop()
 
-    # ---- サマリーメトリクス ----
+    # サマリー
     st.markdown('<p class="section-title">📊 分析サマリー</p>', unsafe_allow_html=True)
 
     seg_counts = {s: 0 for s in SEGMENT_INFO}
@@ -509,11 +568,7 @@ with tab_result:
         if seg in seg_counts:
             seg_counts[seg] += 1
 
-    avg_score  = sum(r.get("purchase_score", 0) for r in valid) / len(valid)
-    top_intent = max(
-        set(r.get("search_intent","") for r in valid),
-        key=lambda x: sum(1 for r in valid if r.get("search_intent") == x)
-    )
+    avg_score = sum(r.get("purchase_score", 0) for r in valid) / len(valid)
 
     c1, c2, c3, c4, c5, c6 = st.columns(6)
     c1.metric("分析件数",     f"{len(valid)}件")
@@ -525,10 +580,9 @@ with tab_result:
 
     st.markdown("---")
 
-    # ---- フィルター ----
+    # フィルター
     st.markdown('<p class="section-title">🔍 絞り込み</p>', unsafe_allow_html=True)
     f1, f2, f3 = st.columns(3)
-
     with f1:
         seg_filter = st.multiselect(
             "価格帯",
@@ -554,7 +608,7 @@ with tab_result:
     st.caption(f"表示中：{len(filtered)}件 / {len(valid)}件")
     st.markdown("---")
 
-    # ---- キーワード別カード ----
+    # キーワード別カード＋コピーボタン
     st.markdown('<p class="section-title">📝 キーワード別 詳細分析</p>', unsafe_allow_html=True)
 
     for r in filtered:
@@ -564,53 +618,62 @@ with tab_result:
         intent = r.get("search_intent", "")
         ie     = INTENT_EMOJI.get(intent, "🔎")
 
-        # スコアバーの色
-        score_color = info["color"]
-
+        # カードヘッダー部分
         st.markdown(f"""
 <div class="kw-card">
-  <div class="kw-title">
-    {info['emoji']} {r['keyword']}
-  </div>
+  <div class="kw-title">{info['emoji']} {r['keyword']}</div>
   <div class="kw-meta">
     <span class="badge {info['badge']}">{info['label']}</span>
     <span class="meta-chip">{ie} {intent}</span>
     <span class="meta-chip">意図: {r.get('intent_reason','')}</span>
     <span class="meta-chip">層の理由: {r.get('segment_reason','')}</span>
   </div>
-
   <div class="score-wrap">
     <div class="score-label">
       <span>購買意欲スコア</span>
-      <span style="font-weight:700;color:{score_color};">{score} / 10</span>
+      <span style="font-weight:700;color:{info['color']};">{score} / 10</span>
     </div>
     <div class="score-bg">
-      <div class="score-fill" style="width:{score*10}%;background:{score_color};"></div>
+      <div class="score-fill" style="width:{score*10}%;background:{info['color']};"></div>
     </div>
   </div>
-
-  <div style="margin-top:16px;">
-    <div style="font-size:13px;font-weight:600;color:#475569;margin-bottom:8px;">📣 広告文案（3パターン）</div>
-    <div class="ad-grid">
-""", unsafe_allow_html=True)
-
-        for i, ad in enumerate(r.get("ad_copies", []), 1):
-            st.markdown(f"""
-      <div class="ad-card">
-        <div class="ad-num">案{i}</div>
-        <div class="ad-title-text">{ad.get('title','')}</div>
-        <div class="ad-desc-text">{ad.get('description','')}</div>
-      </div>
-""", unsafe_allow_html=True)
-
-        st.markdown(f"""
-    </div>
+  <div style="font-size:13px;font-weight:600;color:#475569;margin:16px 0 8px;">
+    📣 広告文案（3パターン）
   </div>
-  <div class="advice-box">💡 アドバイス：{r.get('advice','')}</div>
 </div>
 """, unsafe_allow_html=True)
 
-    # ---- 一覧表 ----
+        # 広告文カード＋コピーボタン（Streamlitのボタンで実装）
+        ad_cols = st.columns(3)
+        for i, ad in enumerate(r.get("ad_copies", [])[:3]):
+            with ad_cols[i]:
+                title_text = ad.get("title", "")
+                desc_text  = ad.get("description", "")
+                copy_text  = f"【タイトル】{title_text}\n【説明文】{desc_text}"
+
+                # 広告文の表示
+                st.markdown(f"""
+<div class="ad-card">
+  <div class="ad-num">案{i+1}</div>
+  <div class="ad-title-text">{title_text}</div>
+  <div class="ad-desc-text">{desc_text}</div>
+</div>
+""", unsafe_allow_html=True)
+
+                # コピーボタン
+                # st.code でテキストを選択しやすく表示
+                with st.expander("📋 テキストをコピー", expanded=False):
+                    st.code(copy_text, language=None)
+
+        # アドバイス
+        st.markdown(f"""
+<div class="advice-box" style="margin-top:8px;">
+  💡 アドバイス：{r.get('advice','')}
+</div>
+<br>
+""", unsafe_allow_html=True)
+
+    # 一覧表
     st.markdown("---")
     st.markdown('<p class="section-title">📋 一覧比較表</p>', unsafe_allow_html=True)
 
@@ -629,10 +692,9 @@ with tab_result:
     df = pd.DataFrame(rows)
     st.dataframe(df, use_container_width=True, hide_index=True)
 
-    # ---- ダウンロード ----
+    # ダウンロード
     st.markdown("---")
     st.markdown('<p class="section-title">💾 データ保存</p>', unsafe_allow_html=True)
-
     now       = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     csv_data  = df.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
     json_data = json.dumps(results, ensure_ascii=False, indent=2).encode("utf-8")
@@ -657,11 +719,69 @@ with tab_result:
 
 
 # =====================================
-# タブ③：使い方ガイド
+# タブ③：グラフ分析
+# =====================================
+with tab_chart:
+    if "results" not in st.session_state:
+        st.info("👈 「🔍 キーワード分析」タブで分析してください。")
+        st.stop()
+
+    results = st.session_state["results"]
+    valid   = [r for r in results if "error" not in r]
+
+    if not valid:
+        st.error("有効な分析結果がありません。")
+        st.stop()
+
+    seg_counts = {s: 0 for s in SEGMENT_INFO}
+    for r in valid:
+        seg = r.get("price_segment", "")
+        if seg in seg_counts:
+            seg_counts[seg] += 1
+
+    st.markdown('<p class="section-title">📊 グラフ分析</p>', unsafe_allow_html=True)
+
+    # 上段：棒グラフ（購買意欲）
+    st.plotly_chart(
+        make_score_bar_chart(valid),
+        use_container_width=True,
+    )
+
+    st.markdown("---")
+
+    # 下段：円グラフ＋検索意図グラフ を横並び
+    g1, g2 = st.columns(2)
+
+    with g1:
+        st.plotly_chart(
+            make_segment_pie_chart(seg_counts),
+            use_container_width=True,
+        )
+
+    with g2:
+        st.plotly_chart(
+            make_intent_bar_chart(valid),
+            use_container_width=True,
+        )
+
+    st.markdown("---")
+
+    # グラフの読み方ガイド
+    st.markdown('<p class="section-title">💡 グラフの読み方</p>', unsafe_allow_html=True)
+    st.markdown("""
+| グラフ | 見るべきポイント |
+|--------|----------------|
+| 📈 購買意欲スコア | スコアが高いほど今すぐ購入につながりやすい。8点以上は入札単価を上げる価値あり |
+| 🎯 価格帯別分布 | どの層が多いか把握し、その層向けの広告文を優先的に作成する |
+| 🔍 検索意図別件数 | 「購買直前」が多ければ直接訴求型、「比較検討段階」が多ければ比較訴求型が有効 |
+""")
+
+
+# =====================================
+# タブ④：使い方ガイド
 # =====================================
 with tab_guide:
     st.markdown('<p class="section-title">📖 使い方ガイド</p>', unsafe_allow_html=True)
-
     st.markdown("""
 ### STEP 1　キーワードを入力する
 「🔍 キーワード分析」タブを開き、分析したいキーワードを1行1つで入力します。
@@ -670,7 +790,7 @@ with tab_guide:
 ---
 
 ### STEP 2　分析開始ボタンを押す
-「🚀 分析開始」ボタンをクリックすると、AIがキーワードごとに以下を分析します。
+AIがキーワードごとに以下を分析します。
 
 | 項目 | 内容 |
 |------|------|
@@ -682,14 +802,18 @@ with tab_guide:
 
 ---
 
-### STEP 3　結果を確認・絞り込む
-「📊 分析結果」タブで結果を確認できます。
-価格帯・検索意図・購買意欲スコアで絞り込みができます。
+### STEP 3　グラフで傾向を把握する
+「📊 グラフ分析」タブで3つのグラフが確認できます。
+
+- **購買意欲スコア比較**：どのキーワードが最も購買に近いか
+- **価格帯別分布**：ターゲット層の内訳
+- **検索意図別件数**：ユーザーの行動パターン
 
 ---
 
-### STEP 4　CSVでダウンロード
-結果をCSV形式でダウンロードしてExcelで活用できます。
+### STEP 4　広告文をコピーして使う
+各広告文の下にある「📋 テキストをコピー」を展開すると、
+タイトルと説明文をそのままコピーできます。
 
 ---
 
