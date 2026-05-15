@@ -340,35 +340,105 @@ def make_history_line_chart(history: list, keyword: str):
 # =====================================
 def render_keyword_cards(filtered: list):
     for r in filtered:
-        seg    = r.get("price_segment","Standard")
+        seg    = r.get("price_segment", "Standard")
         info   = SEGMENT_INFO.get(seg, SEGMENT_INFO["Standard"])
         score  = r.get("purchase_score", 0)
-        intent = r.get("search_intent","")
-        ie     = INTENT_EMOJI.get(intent,"🔎")
+        intent = r.get("search_intent", "")
+        ie     = INTENT_EMOJI.get(intent, "🔎")
 
-        st.markdown(f"""
-<div class="kw-card">
-  <div class="kw-title">{info['emoji']} {r['keyword']}</div>
-  <div class="kw-meta">
-    <span class="badge {info['badge']}">{info['label']}</span>
-    <span class="meta-chip">{ie} {intent}</span>
-    <span class="meta-chip">意図: {r.get('intent_reason','')}</span>
-    <span class="meta-chip">層の理由: {r.get('segment_reason','')}</span>
-  </div>
-  <div class="score-wrap">
-    <div class="score-label">
-      <span>購買意欲スコア</span>
-      <span style="font-weight:700;color:{info['color']};">{score} / 10</span>
-    </div>
-    <div class="score-bg">
-      <div class="score-fill" style="width:{score*10}%;background:{info['color']};"></div>
-    </div>
-  </div>
-  <div style="font-size:13px;font-weight:600;color:#475569;margin:16px 0 8px;">
-    📣 広告文案（3パターン）
-  </div>
-</div>
-""", unsafe_allow_html=True)
+        # 追加項目
+        emotion    = r.get("emotion", "")
+        competitor = r.get("competitor_position", "")
+        cta        = r.get("cta_suggestion", "")
+        lp_advice  = r.get("lp_advice", "")
+
+        # カードヘッダー
+        st.markdown(
+            f'<div class="kw-card">'
+            f'<div class="kw-title">{info["emoji"]} {r["keyword"]}</div>'
+            f'<div class="kw-meta">'
+            f'<span class="badge {info["badge"]}">{info["label"]}</span>'
+            f'<span class="meta-chip">{ie} {intent}</span>'
+            f'<span class="meta-chip">意図: {r.get("intent_reason", "")}</span>'
+            f'<span class="meta-chip">層の理由: {r.get("segment_reason", "")}</span>'
+            f'</div>'
+            f'<div class="score-wrap">'
+            f'<div class="score-label">'
+            f'<span>購買意欲スコア</span>'
+            f'<span style="font-weight:700;color:{info["color"]};">{score} / 10</span>'
+            f'</div>'
+            f'<div class="score-bg">'
+            f'<div class="score-fill" style="width:{score * 10}%;background:{info["color"]};"></div>'
+            f'</div>'
+            f'</div>'
+            f'<div style="font-size:13px;font-weight:600;color:#475569;margin:16px 0 8px;">'
+            f'📣 広告文案（3パターン）'
+            f'</div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+
+        # 広告文カード（3列）
+        ad_cols = st.columns(3)
+        for i, ad in enumerate(r.get("ad_copies", [])[:3]):
+            with ad_cols[i]:
+                title_text   = ad.get("title", "")
+                desc_text    = ad.get("description", "")
+                appeal_point = ad.get("appeal_point", "")
+                copy_text    = f"【タイトル】{title_text}\n【説明文】{desc_text}"
+
+                st.markdown(
+                    f'<div class="ad-card">'
+                    f'<div class="ad-num">案{i + 1}</div>'
+                    f'<div class="ad-title-text">{title_text}</div>'
+                    f'<div class="ad-desc-text">{desc_text}</div>'
+                    + (
+                        f'<div style="margin-top:8px;font-size:11px;'
+                        f'color:#6366f1;font-weight:600;">✨ {appeal_point}</div>'
+                        if appeal_point else ""
+                    )
+                    + f'</div>',
+                    unsafe_allow_html=True,
+                )
+
+                with st.expander("📋 コピー", expanded=False):
+                    st.code(copy_text, language=None)
+
+        # 感情・競合・CTA チップ
+        chips = ""
+        if emotion:
+            chips += f'<span class="meta-chip">😊 感情: {emotion}</span>'
+        if competitor:
+            chips += f'<span class="meta-chip">⚔️ 差別化: {competitor}</span>'
+        if cta:
+            chips += f'<span class="meta-chip">🖱️ CTA案: {cta}</span>'
+
+        if chips:
+            st.markdown(
+                f'<div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0;">'
+                f'{chips}'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+
+        # LP改善提案
+        if lp_advice:
+            st.markdown(
+                f'<div style="background:#f0fdf4;border:1px solid #86efac;'
+                f'border-left:4px solid #22c55e;border-radius:10px;'
+                f'padding:10px 16px;font-size:13px;color:#14532d;margin:6px 0;">'
+                f'🖥️ LP改善提案：{lp_advice}'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+
+        # アドバイスボックス
+        st.markdown(
+            f'<div class="advice-box">'
+            f'💡 アドバイス：{r.get("advice", "")}'
+            f'</div><br>',
+            unsafe_allow_html=True,
+        )
 
         ad_cols = st.columns(3)
         for i, ad in enumerate(r.get("ad_copies",[])[:3]):
