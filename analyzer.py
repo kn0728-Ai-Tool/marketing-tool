@@ -231,3 +231,4 @@ def analyze_keywords_batch(
             results.append({"keyword": kw, "error": str(e)})
         time.sleep(0.5)
     return results
+    
