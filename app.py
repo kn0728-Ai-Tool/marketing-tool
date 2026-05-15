@@ -596,6 +596,9 @@ with tab_result:
         show_empty_state("📝","まだ分析結果がありません",
             "「🔍 キーワード分析」タブでキーワードを入力して分析してください。")
     else:
+        if "loaded_session_id" in st.session_state:
+            sid = st.session_state.pop("loaded_session_id")
+            st.success(f"✅ セッション {sid} の分析結果を読み込みました。")
         results = st.session_state["results"]
         valid   = [r for r in results if "error" not in r]
         if not valid:
@@ -1544,7 +1547,8 @@ with tab_history:
                 if st.button("📂 表示",key=f"show_{s['id']}",use_container_width=True):
                     loaded = get_session_results(s["id"])
                     st.session_state["results"] = loaded
-                    st.success(f"セッション {s['id']} を読み込みました。「📝 分析結果」タブを確認してください。")
+                    st.session_state["loaded_session_id"] = s["id"]
+                    st.rerun()
             with col_btn2:
                 st.markdown("<br>", unsafe_allow_html=True)
                 if st.button("🗑️ 削除",key=f"del_{s['id']}",use_container_width=True):
