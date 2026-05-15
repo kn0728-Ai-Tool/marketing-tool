@@ -1,11 +1,13 @@
-# app.py  v2.8
-# 修正：fillcolorエラー解消（rgba固定定義に変更）
+# app.py  v3.0
+# 追加機能：トレンド予測グラフ・ヒートマップ・年代別AI分析（タブ④拡張）
 
 import streamlit as st
 import pandas as pd
+import numpy as np
 import datetime
 import json
 import time
+import re
 import plotly.graph_objects as go
 import plotly.express as px
 from report import generate_html_report
@@ -506,7 +508,7 @@ with st.sidebar:
     for seg, info in SEGMENT_INFO.items():
         st.markdown(f"{info['emoji']} **{seg}**  \n{info['strategy']}\n")
     st.markdown("---")
-    st.caption("v2.8 | Powered by OpenAI")
+    st.caption("v3.0 | Powered by OpenAI")
 
 
 # =====================================
@@ -801,7 +803,7 @@ with tab_trend:
 
         st.markdown("---")
 
-        # ---- 時系列グラフ（修正済み：fillcolorをCHART_COLORSから取得）----
+        # ---- 時系列グラフ ----
         if not trend_df.empty:
             st.markdown('<p class="section-title">📈 検索ボリューム推移（Google Trends）</p>', unsafe_allow_html=True)
             fig = go.Figure()
@@ -978,6 +980,399 @@ with tab_trend:
                     f'</div>',
                     unsafe_allow_html=True,
                 )
+
+        # ====================================================
+        # ▼▼▼ v3.0 新機能：トレンド予測・ヒートマップ・年代別分析 ▼▼▼
+        # ====================================================
+        st.markdown("---")
+        st.markdown('<p class="section-title">🔮 詳細分析（v3.0 新機能）</p>', unsafe_allow_html=True)
+
+        subtab_pred, subtab_heat, subtab_age = st.tabs([
+            "📈 トレンド予測",
+            "🟥 ヒートマップ",
+            "👥 年代別分析",
+        ])
+
+        # ────────────────────────────────────────────────────
+        # サブタブ A: トレンド予測
+        # ────────────────────────────────────────────────────
+        with subtab_pred:
+            st.markdown("過去のトレンドデータを線形回帰で分析し、今後の推移を予測します。")
+
+            col_p1, col_p2 = st.columns([3, 1])
+            with col_p1:
+                pred_keyword = st.text_input(
+                    "予測するキーワード",
+                    placeholder="例: ワイヤレスイヤホン",
+                    key="pred_kw",
+                )
+            with col_p2:
+                forecast_weeks = st.number_input(
+                    "予測週数", min_value=4, max_value=52, value=12, step=4, key="pred_weeks"
+                )
+
+            if st.button("📊 予測を実行", key="btn_predict") and pred_keyword:
+                with st.spinner("Google Trends からデータ取得 & 予測中..."):
+                    try:
+                        from pytrends.request import TrendReq
+
+                        pytrends = TrendReq(hl="ja-JP", tz=540)
+                        pytrends.build_payload([pred_keyword], timeframe="today 12-m", geo="JP")
+                        df_trend = pytrends.interest_over_time()
+
+                        if df_trend.empty or pred_keyword not in df_trend.columns:
+                            st.warning("データが取得できませんでした。別のキーワードをお試しください。")
+                        else:
+                            dates  = df_trend.index.strftime("%Y-%m-%d").tolist()
+                            values = df_trend[pred_keyword].tolist()
+
+                            # ── 線形回帰による予測 ──
+                            x = np.arange(len(values), dtype=float)
+                            y = np.array(values, dtype=float)
+                            coeffs = np.polyfit(x, y, 1)
+                            slope, intercept = coeffs
+                            y_pred_hist = np.polyval(coeffs, x)
+
+                            ss_res = np.sum((y - y_pred_hist) ** 2)
+                            ss_tot = np.sum((y - np.mean(y)) ** 2)
+                            r2 = float(1 - ss_res / ss_tot) if ss_tot != 0 else 0.0
+                            residual_std = float(np.std(y - y_pred_hist))
+
+                            fw = int(forecast_weeks)
+                            last_date = datetime.datetime.strptime(dates[-1], "%Y-%m-%d")
+                            future_dates = [
+                                (last_date + datetime.timedelta(weeks=i+1)).strftime("%Y-%m-%d")
+                                for i in range(fw)
+                            ]
+                            future_x = np.arange(len(x), len(x) + fw, dtype=float)
+                            future_y = np.polyval(coeffs, future_x)
+                            future_y_clipped = np.clip(future_y, 0, 100).tolist()
+                            upper = np.clip(future_y + 1.96 * residual_std, 0, 100).tolist()
+                            lower = np.clip(future_y - 1.96 * residual_std, 0, 100).tolist()
+
+                            if slope > 0.3:
+                                trend_label = "📈 上昇傾向"
+                            elif slope < -0.3:
+                                trend_label = "📉 下降傾向"
+                            else:
+                                trend_label = "➡️ 横ばい"
+
+                            # ── 指標カード ──
+                            m1, m2, m3 = st.columns(3)
+                            m1.metric("トレンド判定",  trend_label)
+                            m2.metric("週あたり変化",  f"{slope:+.2f} pt")
+                            m3.metric("モデル精度 R²", f"{r2:.3f}")
+
+                            # ── グラフ描画 ──
+                            fig_pred = go.Figure()
+
+                            fig_pred.add_trace(go.Scatter(
+                                x=dates, y=values,
+                                mode="lines+markers", name="実績値",
+                                line=dict(color="#3b82f6", width=2),
+                                marker=dict(size=4),
+                            ))
+
+                            # 信頼区間の塗りつぶし
+                            fig_pred.add_trace(go.Scatter(
+                                x=future_dates + future_dates[::-1],
+                                y=upper + lower[::-1],
+                                fill="toself",
+                                fillcolor="rgba(251,146,60,0.15)",
+                                line=dict(color="rgba(255,255,255,0)"),
+                                name="95% 信頼区間",
+                                showlegend=True,
+                            ))
+
+                            fig_pred.add_trace(go.Scatter(
+                                x=future_dates, y=future_y_clipped,
+                                mode="lines+markers", name="予測値",
+                                line=dict(color="#f97316", width=2, dash="dash"),
+                                marker=dict(size=5, symbol="diamond"),
+                            ))
+
+                            fig_pred.update_layout(
+                                title=dict(
+                                    text=f"「{pred_keyword}」トレンド予測（{fw}週先まで）",
+                                    font=dict(size=14, color="#1e293b"),
+                                ),
+                                xaxis_title="日付",
+                                yaxis_title="検索インデックス（0-100）",
+                                legend=dict(orientation="h", y=-0.2),
+                                height=420,
+                                plot_bgcolor="white",
+                                paper_bgcolor="white",
+                                margin=dict(l=20, r=20, t=60, b=60),
+                            )
+                            fig_pred.add_vline(
+                                x=dates[-1],
+                                line_dash="dot",
+                                line_color="gray",
+                                annotation_text="現在",
+                            )
+                            st.plotly_chart(fig_pred, use_container_width=True)
+
+                    except Exception as e:
+                        st.error(f"エラーが発生しました: {e}")
+
+        # ────────────────────────────────────────────────────
+        # サブタブ B: ヒートマップ
+        # ────────────────────────────────────────────────────
+        with subtab_heat:
+            st.markdown("曜日 × 時間帯の検索アクティビティを推定します。広告配信の最適時間帯発見に活用できます。")
+
+            heat_keyword = st.text_input(
+                "ヒートマップを作成するキーワード",
+                placeholder="例: プロテイン",
+                key="heat_kw",
+            )
+
+            if st.button("🌡️ ヒートマップ生成", key="btn_heat") and heat_keyword:
+                with st.spinner("ヒートマップデータを生成中..."):
+                    try:
+                        from pytrends.request import TrendReq
+
+                        pytrends = TrendReq(hl="ja-JP", tz=540)
+                        pytrends.build_payload([heat_keyword], timeframe="today 3-m", geo="JP")
+                        df_heat_raw = pytrends.interest_over_time()
+                        weekly_vals = (
+                            df_heat_raw[heat_keyword].tolist()
+                            if not df_heat_raw.empty and heat_keyword in df_heat_raw.columns
+                            else None
+                        )
+
+                        # ── ヒートマップデータ生成 ──
+                        days = ["月", "火", "水", "木", "金", "土", "日"]
+                        hours = list(range(24))
+                        hour_base = np.array([
+                            5, 3, 2, 2, 3, 8, 20, 40, 60, 70, 72, 70,
+                            65, 68, 70, 72, 75, 78, 80, 75, 65, 50, 35, 18,
+                        ], dtype=float)
+                        day_coeff = np.array([1.0, 1.0, 1.0, 1.0, 1.1, 1.2, 1.1])
+
+                        if weekly_vals and len(weekly_vals) >= 4:
+                            scale = float(np.mean(weekly_vals[-4:])) / 70.0
+                        else:
+                            scale = 1.0
+
+                        rng = np.random.default_rng(abs(hash(heat_keyword)) % (2**32))
+                        matrix = []
+                        for d_idx in range(7):
+                            row = []
+                            for h_idx in range(24):
+                                val = hour_base[h_idx] * day_coeff[d_idx] * scale
+                                noise = rng.uniform(0.9, 1.1)
+                                val = float(np.clip(val * noise, 0, 100))
+                                row.append(round(val, 1))
+                            matrix.append(row)
+
+                        fig_heat = go.Figure(data=go.Heatmap(
+                            z=matrix,
+                            x=[f"{h:02d}:00" for h in hours],
+                            y=days,
+                            colorscale="YlOrRd",
+                            colorbar=dict(title="検索強度"),
+                            hoverongaps=False,
+                            hovertemplate="曜日: %{y}<br>時間: %{x}<br>強度: %{z}<extra></extra>",
+                        ))
+                        fig_heat.update_layout(
+                            title=dict(
+                                text=f"「{heat_keyword}」の曜日×時間帯ヒートマップ（推定）",
+                                font=dict(size=14, color="#1e293b"),
+                            ),
+                            xaxis_title="時間帯",
+                            yaxis_title="曜日",
+                            height=400,
+                            plot_bgcolor="white",
+                            paper_bgcolor="white",
+                            margin=dict(l=20, r=20, t=60, b=40),
+                        )
+                        st.plotly_chart(fig_heat, use_container_width=True)
+                        st.caption("※ 時間帯データは週次トレンドと一般的な検索行動モデルから推定した値です。")
+
+                        # ピーク時間帯のサマリー
+                        matrix_np = np.array(matrix)
+                        peak_idx = int(np.argmax(matrix_np))
+                        peak_day_idx  = peak_idx // 24
+                        peak_hour_idx = peak_idx % 24
+                        st.info(
+                            f"📌 最も検索が活発な時間帯：**{days[peak_day_idx]}曜日 "
+                            f"{peak_hour_idx:02d}:00〜{peak_hour_idx+1:02d}:00**"
+                        )
+
+                    except Exception as e:
+                        st.error(f"エラーが発生しました: {e}")
+
+        # ────────────────────────────────────────────────────
+        # サブタブ C: 年代別分析
+        # ────────────────────────────────────────────────────
+        with subtab_age:
+            st.markdown("OpenAI API が各年代の関心度・購買意向・効果的な訴求チャネルを分析します。")
+
+            age_keyword = st.text_input(
+                "年代別分析するキーワード",
+                placeholder="例: サブスクリプションサービス",
+                key="age_kw",
+            )
+
+            st.markdown("##### 年代グループの設定")
+            st.caption("分析したい年代の範囲を設定してください（最大6グループ）")
+
+            DEFAULT_RANGES = [(10,19),(20,29),(30,39),(40,49),(50,59),(60,79)]
+            DEFAULT_LABELS = ["10代","20代","30代","40代","50代","60代以上"]
+
+            use_custom = st.checkbox("年代グループをカスタマイズする", value=False, key="age_custom")
+
+            if use_custom:
+                num_groups = st.slider("グループ数", 2, 6, 4, key="age_num")
+                ranges_custom = []
+                labels_custom = []
+                cols_age = st.columns(num_groups)
+                for i, c in enumerate(cols_age):
+                    with c:
+                        lbl = st.text_input(f"ラベル{i+1}", value=DEFAULT_LABELS[i], key=f"age_lbl_{i}")
+                        mn  = st.number_input("最小年齢", value=DEFAULT_RANGES[i][0], min_value=0, max_value=99, key=f"age_mn_{i}")
+                        mx  = st.number_input("最大年齢", value=DEFAULT_RANGES[i][1], min_value=1, max_value=99, key=f"age_mx_{i}")
+                        labels_custom.append(lbl)
+                        ranges_custom.append((int(mn), int(mx)))
+                age_groups = [
+                    {"label": labels_custom[i], "min": ranges_custom[i][0], "max": ranges_custom[i][1]}
+                    for i in range(num_groups)
+                ]
+            else:
+                age_groups = [
+                    {"label": DEFAULT_LABELS[i], "min": DEFAULT_RANGES[i][0], "max": DEFAULT_RANGES[i][1]}
+                    for i in range(len(DEFAULT_LABELS))
+                ]
+                st.markdown("**デフォルト設定：** " + "　".join(DEFAULT_LABELS))
+
+            if st.button("🧠 年代別AI分析を実行", key="btn_age") and age_keyword:
+                if not api_key:
+                    st.error("⚠️ サイドバーにAPIキーを入力してください。")
+                else:
+                    with st.spinner("AIが各年代を分析中...（10〜20秒ほどかかります）"):
+                        try:
+                            from openai import OpenAI as _OpenAI
+
+                            age_labels_str = "・".join([g["label"] for g in age_groups])
+                            age_prompt = f"""
+あなたはマーケティングデータアナリストです。
+以下のキーワードについて、指定された年代別に詳細な分析を行ってください。
+
+キーワード: 「{age_keyword}」
+分析対象の年代: {age_labels_str}
+
+各年代について、以下の情報をJSON形式で返してください。
+JSON以外のテキストは一切出力しないでください。
+
+{{
+  "age_groups": [
+    {{
+      "label": "年代ラベル",
+      "interest": 0から100の整数,
+      "purchase_rate": 0から100の整数,
+      "appeal_points": ["訴求ポイント1", "訴求ポイント2", "訴求ポイント3"],
+      "risks": ["リスク1", "リスク2"],
+      "channels": ["チャネル1", "チャネル2", "チャネル3"],
+      "summary": "この年代の特徴を2〜3文で要約"
+    }}
+  ],
+  "overall_insight": "全年代を横断した総合インサイトを3〜4文で記述"
+}}
+"""
+                            _oa = _OpenAI(api_key=api_key)
+                            _resp = _oa.chat.completions.create(
+                                model="gpt-4o-mini",
+                                messages=[{"role":"user","content":age_prompt}],
+                                temperature=0.4,
+                                max_tokens=2000,
+                            )
+                            raw_age = _resp.choices[0].message.content.strip()
+
+                            # JSON 抽出
+                            json_match = re.search(r"\{.*\}", raw_age, re.DOTALL)
+                            if not json_match:
+                                st.error("AIの応答からJSONを取得できませんでした。もう一度お試しください。")
+                            else:
+                                result_age = json.loads(json_match.group())
+                                st.session_state["age_result"] = result_age
+
+                        except json.JSONDecodeError:
+                            st.error("AIの応答のパースに失敗しました。もう一度お試しください。")
+                        except Exception as e:
+                            st.error(f"エラーが発生しました: {e}")
+
+            # ── 年代別分析結果の表示 ──
+            if "age_result" in st.session_state:
+                result_age = st.session_state["age_result"]
+                age_grp_list = result_age.get("age_groups", [])
+
+                if age_grp_list:
+                    # グラフ
+                    labels_plot  = [g["label"]        for g in age_grp_list]
+                    interest_vals = [g.get("interest", 0)      for g in age_grp_list]
+                    purchase_vals = [g.get("purchase_rate", 0) for g in age_grp_list]
+
+                    fig_age = go.Figure()
+                    fig_age.add_trace(go.Bar(
+                        name="関心度",
+                        x=labels_plot, y=interest_vals,
+                        marker_color="#3b82f6",
+                        text=interest_vals, textposition="outside",
+                    ))
+                    fig_age.add_trace(go.Bar(
+                        name="購買・利用意向",
+                        x=labels_plot, y=purchase_vals,
+                        marker_color="#f97316",
+                        text=purchase_vals, textposition="outside",
+                    ))
+                    fig_age.update_layout(
+                        title=dict(
+                            text=f"「{age_keyword}」年代別 関心度 vs 購買意向",
+                            font=dict(size=14, color="#1e293b"),
+                        ),
+                        barmode="group",
+                        yaxis=dict(title="スコア（0-100）", range=[0, 115]),
+                        height=380,
+                        plot_bgcolor="white",
+                        paper_bgcolor="white",
+                        margin=dict(l=20, r=20, t=60, b=40),
+                    )
+                    st.plotly_chart(fig_age, use_container_width=True)
+
+                    # カード表示
+                    st.markdown("#### 年代別詳細")
+                    num_cols = min(len(age_grp_list), 3)
+                    card_cols = st.columns(num_cols)
+                    for i, grp in enumerate(age_grp_list):
+                        with card_cols[i % num_cols]:
+                            st.markdown(f"**{grp['label']}**")
+                            st.progress(
+                                min(int(grp.get("interest", 0)), 100) / 100,
+                                text=f"関心度: {grp.get('interest', 0)}",
+                            )
+                            st.progress(
+                                min(int(grp.get("purchase_rate", 0)), 100) / 100,
+                                text=f"購買意向: {grp.get('purchase_rate', 0)}",
+                            )
+                            with st.expander("詳細を見る"):
+                                st.markdown("**✅ 訴求ポイント**")
+                                for p in grp.get("appeal_points", []):
+                                    st.markdown(f"- {p}")
+                                st.markdown("**⚠️ リスク**")
+                                for r_item in grp.get("risks", []):
+                                    st.markdown(f"- {r_item}")
+                                st.markdown("**📡 効果的チャネル**")
+                                for ch in grp.get("channels", []):
+                                    st.markdown(f"- {ch}")
+                                st.markdown(f"**📝 概要**  \n{grp.get('summary','')}")
+
+                    # 総合インサイト
+                    st.markdown("#### 💡 総合インサイト")
+                    st.info(result_age.get("overall_insight", ""))
+        # ====================================================
+        # ▲▲▲ v3.0 新機能ここまで ▲▲▲
+        # ====================================================
 
 
 # =====================================
@@ -1210,6 +1605,9 @@ Google Trendsの実データで日本市場の検索ボリューム推移を分�
 | 関連キーワード | 実際に一緒に検索されているワードを自動取得 |
 | 最新ニュース | Google Newsから関連ニュースをリアルタイム取得 |
 | AI市場分析 | データをもとにAIが市場動向と広告戦略を提言 |
+| 📈 トレンド予測 | 過去データから線形回帰で将来トレンドを予測（v3.0） |
+| 🟥 ヒートマップ | 曜日×時間帯の検索アクティビティを可視化（v3.0） |
+| 👥 年代別分析 | AIが各年代の関心度・購買意向を分析（v3.0） |
 
 💡 **コツ：同じキーワードを定期的に取得すると市場の変化を追えます**
 
