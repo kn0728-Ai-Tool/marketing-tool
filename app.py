@@ -235,3 +235,475 @@ def make_score_bar_chart(valid):
     ))
     fig.update_layout(
         title=dict(text="📈 購買意欲スコア比較", font=dict(size=15, color="#1e293b")),
+        xaxis=dict(range=[0,11], title="購買意欲スコア"),
+        yaxis=dict(autorange="reversed"),
+        plot_bgcolor="white", paper_bgcolor="white",
+        margin=dict(l=20,r=60,t=50,b=30),
+        height=max(300, len(valid)*44),
+        showlegend=False,
+    )
+    fig.update_xaxes(showgrid=True, gridcolor="#f1f5f9")
+    fig.update_yaxes(showgrid=False)
+    return fig
+
+def make_segment_pie_chart(seg_counts):
+    labels = [f"{SEGMENT_INFO[s]['emoji']} {s}" for s,c in seg_counts.items() if c>0]
+    values = [c for c in seg_counts.values() if c>0]
+    colors = [SEGMENT_INFO[s]["color"] for s,c in seg_counts.items() if c>0]
+    fig = go.Figure(go.Pie(
+        labels=labels, values=values,
+        marker=dict(colors=colors, line=dict(color="white",width=2)),
+        textinfo="label+percent", hole=0.45,
+        hovertemplate="<b>%{label}</b><br>%{value}件<extra></extra>",
+    ))
+    fig.update_layout(
+        title=dict(text="🎯 価格帯別 分布", font=dict(size=15,color="#1e293b")),
+        plot_bgcolor="white", paper_bgcolor="white",
+        margin=dict(l=20,r=20,t=50,b=20), height=320,
+    )
+    return fig
+
+def make_intent_bar_chart(valid):
+    intent_counts = {}
+    for r in valid:
+        k = r.get("search_intent","不明")
+        intent_counts[k] = intent_counts.get(k,0)+1
+    colors_map = {"比較検討段階":"#6366f1","購買直前":"#10b981","情報収集":"#f59e0b","価格調査":"#ef4444"}
+    labels = [f"{INTENT_EMOJI.get(k,'🔎')} {k}" for k in intent_counts]
+    values = list(intent_counts.values())
+    bar_colors = [colors_map.get(k,"#94a3b8") for k in intent_counts]
+    fig = go.Figure(go.Bar(
+        x=labels, y=values,
+        marker=dict(color=bar_colors),
+        text=values, textposition="outside",
+        hovertemplate="<b>%{x}</b><br>%{y}件<extra></extra>",
+    ))
+    fig.update_layout(
+        title=dict(text="🔍 検索意図別 件数", font=dict(size=15,color="#1e293b")),
+        plot_bgcolor="white", paper_bgcolor="white",
+        margin=dict(l=20,r=20,t=50,b=30), height=300,
+        showlegend=False,
+    )
+    fig.update_yaxes(showgrid=True, gridcolor="#f1f5f9", dtick=1)
+    fig.update_xaxes(showgrid=False)
+    return fig
+
+def make_history_line_chart(history: list, keyword: str):
+    """キーワードの購買意欲推移グラフ"""
+    dates  = [h.get("session_date","") for h in history]
+    scores = [h.get("purchase_score", 0) for h in history]
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=dates, y=scores,
+        mode="lines+markers+text",
+        text=scores,
+        textposition="top center",
+        line=dict(color="#6366f1", width=3),
+        marker=dict(size=10, color="#6366f1"),
+        hovertemplate="<b>%{x}</b><br>スコア: %{y}/10<extra></extra>",
+    ))
+    fig.update_layout(
+        title=dict(text=f"📈 「{keyword}」の購買意欲推移", font=dict(size=14,color="#1e293b")),
+        xaxis=dict(title="分析日時"),
+        yaxis=dict(title="購買意欲スコア", range=[0,11], dtick=1),
+        plot_bgcolor="white", paper_bgcolor="white",
+        margin=dict(l=20,r=20,t=50,b=30), height=280,
+    )
+    fig.update_xaxes(showgrid=True, gridcolor="#f1f5f9")
+    fig.update_yaxes(showgrid=True, gridcolor="#f1f5f9")
+    return fig
+
+# =====================================
+# キーワードカード表示（共通関数）
+# =====================================
+def render_keyword_cards(filtered: list):
+    for r in filtered:
+        seg    = r.get("price_segment","Standard")
+        info   = SEGMENT_INFO.get(seg, SEGMENT_INFO["Standard"])
+        score  = r.get("purchase_score", 0)
+        intent = r.get("search_intent","")
+        ie     = INTENT_EMOJI.get(intent,"🔎")
+
+        st.markdown(f"""
+<div class="kw-card">
+  <div class="kw-title">{info['emoji']} {r['keyword']}</div>
+  <div class="kw-meta">
+    <span class="badge {info['badge']}">{info['label']}</span>
+    <span class="meta-chip">{ie} {intent}</span>
+    <span class="meta-chip">意図: {r.get('intent_reason','')}</span>
+    <span class="meta-chip">層の理由: {r.get('segment_reason','')}</span>
+  </div>
+  <div class="score-wrap">
+    <div class="score-label">
+      <span>購買意欲スコア</span>
+      <span style="font-weight:700;color:{info['color']};">{score} / 10</span>
+    </div>
+    <div class="score-bg">
+      <div class="score-fill" style="width:{score*10}%;background:{info['color']};"></div>
+    </div>
+  </div>
+  <div style="font-size:13px;font-weight:600;color:#475569;margin:16px 0 8px;">
+    📣 広告文案（3パターン）
+  </div>
+</div>
+""", unsafe_allow_html=True)
+
+        ad_cols = st.columns(3)
+        for i, ad in enumerate(r.get("ad_copies",[])[:3]):
+            with ad_cols[i]:
+                title_text = ad.get("title","")
+                desc_text  = ad.get("description","")
+                st.markdown(f"""
+<div class="ad-card">
+  <div class="ad-num">案{i+1}</div>
+  <div class="ad-title-text">{title_text}</div>
+  <div class="ad-desc-text">{desc_text}</div>
+</div>
+""", unsafe_allow_html=True)
+                with st.expander("📋 コピー", expanded=False):
+                    st.code(f"【タイトル】{title_text}\n【説明文】{desc_text}", language=None)
+
+        st.markdown(f"""
+<div class="advice-box">💡 アドバイス：{r.get('advice','')}</div><br>
+""", unsafe_allow_html=True)
+
+# =====================================
+# サイドバー
+# =====================================
+with st.sidebar:
+    st.markdown("### 🎯 AI分析ツール")
+    st.markdown("---")
+    if not api_key:
+        st.markdown("**🔑 APIキー設定**")
+        api_key = st.text_input(
+            "OpenAI APIキー", type="password",
+            placeholder="sk-proj-...", label_visibility="collapsed",
+        )
+    else:
+        st.markdown("**🔑 APIキー**")
+        st.success("設定済み ✅")
+    st.markdown("---")
+    st.markdown("**📋 使い方**")
+    st.markdown("1. キーワードを入力（1行1つ）\n2. 「分析開始」をクリック\n3. 結果・グラフを確認\n4. 履歴から過去データを参照")
+    st.markdown("---")
+    st.markdown("**💡 価格帯の目安**")
+    for seg, info in SEGMENT_INFO.items():
+        st.markdown(f"{info['emoji']} **{seg}**  \n{info['strategy']}\n")
+    st.markdown("---")
+    st.caption("v2.2 | Powered by OpenAI")
+
+# =====================================
+# ヒーローバナー
+# =====================================
+st.markdown("""
+<div class="hero-banner">
+  <div class="hero-badge">✨ AI Powered Marketing Tool</div>
+  <div class="hero-title">🎯 AIキーワード分析ツール</div>
+  <div class="hero-sub">
+    キーワードを入力するだけで、検索意図・価格帯・購買意欲・広告文案を自動生成。<br>
+    分析履歴をDBに保存して、キーワードの推移も追跡できます。
+  </div>
+</div>
+""", unsafe_allow_html=True)
+
+# =====================================
+# タブ
+# =====================================
+tab_analyze, tab_result, tab_chart, tab_history, tab_guide = st.tabs([
+    "🔍 キーワード分析",
+    "📝 分析結果",
+    "📊 グラフ分析",
+    "🗄️ 分析履歴",
+    "📖 使い方ガイド",
+])
+
+# =====================================
+# タブ①：キーワード分析
+# =====================================
+with tab_analyze:
+    col_input, col_btn = st.columns([3,1])
+    with col_input:
+        keywords_input = st.text_area(
+            "🔑 分析したいキーワードを入力（1行に1つ・最大20件）",
+            height=180,
+            placeholder="格安スマホ 乗り換え おすすめ\niPhone 最新 購入\nスマホ 高級 おすすめ",
+        )
+    with col_btn:
+        st.markdown("<br>"*3, unsafe_allow_html=True)
+        run_button = st.button("🚀 分析開始", use_container_width=True, type="primary")
+        kw_list = [k.strip() for k in keywords_input.strip().splitlines() if k.strip()]
+        st.info(f"入力数：**{len(kw_list)}件**")
+        memo = st.text_input("📝 メモ（任意）", placeholder="例：競合調査 2024年6月")
+
+    if run_button:
+        if not api_key:
+            st.error("⚠️ サイドバーにAPIキーを入力してください。"); st.stop()
+        if not kw_list:
+            st.warning("⚠️ キーワードを1つ以上入力してください。"); st.stop()
+        if len(kw_list) > 20:
+            st.warning("⚠️ 最初の20件を分析します。")
+            kw_list = kw_list[:20]
+
+        client   = get_client(api_key)
+        results  = []
+        progress = st.progress(0)
+        status   = st.empty()
+
+        for i, kw in enumerate(kw_list):
+            status.markdown(f"⏳ 分析中... **{kw}** ({i+1}/{len(kw_list)})")
+            progress.progress((i+1)/len(kw_list))
+            try:
+                data = analyze_keyword_structured(client, kw)
+                results.append(data)
+            except Exception as e:
+                results.append({"keyword":kw,"error":str(e)})
+            time.sleep(0.5)
+
+        progress.empty()
+
+        # DBに自動保存
+        session_id = save_session(results, memo=memo)
+        status.success(f"✅ {len(kw_list)}件の分析完了！DBに保存しました（セッションID: {session_id}）")
+        st.session_state["results"] = results
+
+# =====================================
+# タブ②：分析結果
+# =====================================
+with tab_result:
+    if "results" not in st.session_state:
+        st.info("👈 「🔍 キーワード分析」タブで分析してください。"); st.stop()
+
+    results = st.session_state["results"]
+    valid   = [r for r in results if "error" not in r]
+    if not valid:
+        st.error("有効な分析結果がありません。"); st.stop()
+
+    st.markdown('<p class="section-title">📊 分析サマリー</p>', unsafe_allow_html=True)
+    seg_counts = {s:0 for s in SEGMENT_INFO}
+    for r in valid:
+        seg = r.get("price_segment","")
+        if seg in seg_counts: seg_counts[seg]+=1
+    avg_score = sum(r.get("purchase_score",0) for r in valid)/len(valid)
+
+    c1,c2,c3,c4,c5,c6 = st.columns(6)
+    c1.metric("分析件数",     f"{len(valid)}件")
+    c2.metric("平均購買意欲", f"{avg_score:.1f}/10")
+    c3.metric("💚 Budget",   f"{seg_counts['Budget']}件")
+    c4.metric("💙 Standard", f"{seg_counts['Standard']}件")
+    c5.metric("💜 Premium",  f"{seg_counts['Premium']}件")
+    c6.metric("🖤 Luxury",   f"{seg_counts['Luxury']}件")
+    st.markdown("---")
+
+    f1,f2,f3 = st.columns(3)
+    with f1:
+        seg_filter = st.multiselect("価格帯", list(SEGMENT_INFO.keys()), default=list(SEGMENT_INFO.keys()))
+    with f2:
+        intent_opts = sorted(set(r.get("search_intent","") for r in valid if r.get("search_intent")))
+        intent_filter = st.multiselect("検索意図", intent_opts, default=intent_opts)
+    with f3:
+        score_min = st.slider("購買意欲スコア（最小）", 1, 10, 1)
+
+    filtered = [r for r in valid
+        if r.get("price_segment") in seg_filter
+        and r.get("search_intent") in intent_filter
+        and r.get("purchase_score",0) >= score_min]
+    st.caption(f"表示中：{len(filtered)}件 / {len(valid)}件")
+    st.markdown("---")
+
+    st.markdown('<p class="section-title">📝 キーワード別 詳細分析</p>', unsafe_allow_html=True)
+    render_keyword_cards(filtered)
+
+    st.markdown("---")
+    st.markdown('<p class="section-title">📋 一覧比較表</p>', unsafe_allow_html=True)
+    rows = []
+    for r in filtered:
+        ad1 = r.get("ad_copies",[{}])[0]
+        rows.append({
+            "キーワード":r.get("keyword",""), "検索意図":r.get("search_intent",""),
+            "価格帯層":r.get("price_segment",""), "購買意欲(1-10)":r.get("purchase_score",""),
+            "広告タイトル案1":ad1.get("title",""), "広告説明文案1":ad1.get("description",""),
+            "アドバイス":r.get("advice",""),
+        })
+    df = pd.DataFrame(rows)
+    st.dataframe(df, use_container_width=True, hide_index=True)
+
+    st.markdown("---")
+    st.markdown('<p class="section-title">💾 データ保存</p>', unsafe_allow_html=True)
+    now       = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    csv_data  = df.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
+    json_data = json.dumps(results, ensure_ascii=False, indent=2).encode("utf-8")
+    dl1,dl2 = st.columns(2)
+    with dl1:
+        st.download_button("📥 CSVでダウンロード", data=csv_data,
+            file_name=f"keyword_analysis_{now}.csv", mime="text/csv", use_container_width=True)
+    with dl2:
+        st.download_button("📥 JSONでダウンロード", data=json_data,
+            file_name=f"keyword_analysis_{now}.json", mime="application/json", use_container_width=True)
+
+# =====================================
+# タブ③：グラフ分析
+# =====================================
+with tab_chart:
+    if "results" not in st.session_state:
+        st.info("👈 「🔍 キーワード分析」タブで分析してください。"); st.stop()
+
+    results = st.session_state["results"]
+    valid   = [r for r in results if "error" not in r]
+    if not valid:
+        st.error("有効な分析結果がありません。"); st.stop()
+
+    seg_counts = {s:0 for s in SEGMENT_INFO}
+    for r in valid:
+        seg = r.get("price_segment","")
+        if seg in seg_counts: seg_counts[seg]+=1
+
+    st.markdown('<p class="section-title">📊 グラフ分析</p>', unsafe_allow_html=True)
+    st.plotly_chart(make_score_bar_chart(valid), use_container_width=True)
+    st.markdown("---")
+    g1,g2 = st.columns(2)
+    with g1: st.plotly_chart(make_segment_pie_chart(seg_counts), use_container_width=True)
+    with g2: st.plotly_chart(make_intent_bar_chart(valid), use_container_width=True)
+
+    st.markdown("---")
+    st.markdown('<p class="section-title">💡 グラフの読み方</p>', unsafe_allow_html=True)
+    st.markdown("""
+| グラフ | 見るべきポイント |
+|--------|----------------|
+| 📈 購買意欲スコア | 8点以上は入札単価を上げる価値あり |
+| 🎯 価格帯別分布 | 多い層の広告文を優先的に強化する |
+| 🔍 検索意図別件数 | 「購買直前」が多ければ直接訴求が有効 |
+""")
+
+# =====================================
+# タブ④：分析履歴
+# =====================================
+with tab_history:
+    st.markdown('<p class="section-title">🗄️ 分析履歴</p>', unsafe_allow_html=True)
+
+    sessions = get_all_sessions()
+
+    if not sessions:
+        st.info("まだ分析履歴がありません。「🔍 キーワード分析」タブで分析してください。")
+        st.stop()
+
+    # ---- 全セッション一覧 ----
+    st.markdown(f"**保存済みセッション数：{len(sessions)}件**")
+    st.markdown("---")
+
+    for s in sessions:
+        col_info, col_btn1, col_btn2 = st.columns([4, 1, 1])
+
+        with col_info:
+            memo_text = f"　📝 {s['memo']}" if s.get("memo") else ""
+            st.markdown(f"""
+<div class="history-card">
+  <div>
+    <div class="history-date">🕐 {s['created_at']}{memo_text}</div>
+  </div>
+  <div class="history-count">📊 {s['kw_count']}件のキーワード</div>
+</div>
+""", unsafe_allow_html=True)
+
+        with col_btn1:
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.button("📂 表示", key=f"show_{s['id']}", use_container_width=True):
+                # このセッションの結果をセッションステートに読み込む
+                loaded = get_session_results(s["id"])
+                st.session_state["results"]         = loaded
+                st.session_state["history_session"] = s
+                st.success(f"セッション {s['id']} を読み込みました。「📝 分析結果」タブを確認してください。")
+
+        with col_btn2:
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.button("🗑️ 削除", key=f"del_{s['id']}", use_container_width=True):
+                delete_session(s["id"])
+                st.warning(f"セッション {s['id']} を削除しました。")
+                st.rerun()
+
+    st.markdown("---")
+
+    # ---- キーワード推移 ----
+    st.markdown('<p class="section-title">📈 キーワード別 推移を確認</p>', unsafe_allow_html=True)
+
+    all_kws = get_all_keywords()
+    if all_kws:
+        selected_kw = st.selectbox(
+            "推移を見たいキーワードを選択",
+            options=all_kws,
+            help="複数回分析されたキーワードの購買意欲スコアの推移を表示します"
+        )
+        if selected_kw:
+            history = get_keyword_history(selected_kw)
+            if len(history) >= 2:
+                st.plotly_chart(
+                    make_history_line_chart(history, selected_kw),
+                    use_container_width=True,
+                )
+                # 推移の変化をコメント
+                first_score = history[0]["purchase_score"]
+                last_score  = history[-1]["purchase_score"]
+                diff        = last_score - first_score
+                if diff > 0:
+                    st.success(f"📈 初回分析から **+{diff}点** 上昇しています。購買意欲が高まっています。")
+                elif diff < 0:
+                    st.warning(f"📉 初回分析から **{diff}点** 下降しています。訴求の見直しを検討してください。")
+                else:
+                    st.info("➡️ スコアに変化はありません。")
+            else:
+                st.info(f"「{selected_kw}」はまだ1回しか分析されていません。複数回分析するとここに推移グラフが表示されます。")
+    else:
+        st.info("保存済みのキーワードがありません。")
+
+    st.markdown("---")
+
+    # ---- 全履歴の集計stats ----
+    st.markdown('<p class="section-title">📊 全履歴サマリー</p>', unsafe_allow_html=True)
+    stats = get_segment_stats()
+    if stats:
+        stat_rows = []
+        for seg, data in stats.items():
+            info = SEGMENT_INFO.get(seg, {})
+            stat_rows.append({
+                "価格帯層":         f"{info.get('emoji','')} {seg}",
+                "分析件数":         f"{data['count']}件",
+                "平均購買意欲":     f"{data['avg_score']:.1f}/10",
+                "推奨戦略":         info.get("strategy",""),
+            })
+        st.dataframe(pd.DataFrame(stat_rows), use_container_width=True, hide_index=True)
+
+# =====================================
+# タブ⑤：使い方ガイド
+# =====================================
+with tab_guide:
+    st.markdown('<p class="section-title">📖 使い方ガイド</p>', unsafe_allow_html=True)
+    st.markdown("""
+### STEP 1　キーワードを入力する
+1行1つ・最大20件まで分析できます。メモ欄に目的を記録しておくと履歴で見返しやすくなります。
+
+---
+
+### STEP 2　分析開始ボタンを押す
+AIがキーワードごとに検索意図・価格帯・購買意欲・広告文案を自動生成します。
+**結果はDBに自動保存されます。**
+
+---
+
+### STEP 3　グラフで傾向を把握する
+「📊 グラフ分析」タブで購買意欲・価格帯分布・検索意図を視覚的に確認できます。
+
+---
+
+### STEP 4　履歴でキーワードの推移を追う
+「🗄️ 分析履歴」タブで過去の分析を再表示したり、キーワードの購買意欲スコア推移を確認できます。
+
+---
+
+### 💡 価格帯別の広告戦略
+
+| 価格帯 | 主な訴求軸 | キーワード例 |
+|--------|-----------|-------------|
+| 💚 Budget | コスパ・割引・最安値 | 格安・安い・お得 |
+| 💙 Standard | 機能・信頼性・実績 | おすすめ・人気・比較 |
+| 💜 Premium | 品質・体験・専門性 | 高品質・こだわり・プロ |
+| 🖤 Luxury | ブランド・希少性・限定 | 高級・限定・ブランド |
+""")
