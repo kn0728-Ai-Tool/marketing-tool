@@ -751,199 +751,313 @@ with tab_chart:
  
  
 # =====================================
-# タブ④：トレンド分析（新規）
+# タブ④：トレンド分析
 # =====================================
 with tab_trend:
-    st.markdown('<p class="section-title">📈 ジャンル・カテゴリ別 トレンド分析</p>', unsafe_allow_html=True)
-    st.caption("ジャンルとキーワードを入力して分析するたびにデータが蓄積され、時系列でトレンドが見えてきます。")
- 
+    st.markdown('<p class="section-title">📈 日本市場 トレンド分析</p>', unsafe_allow_html=True)
+    st.caption("Google Trendsの実データを使って、日本市場における検索ボリュームの推移をリアルタイムで分析します。")
+
     # ---- 入力エリア ----
-    col_genre, col_kws = st.columns([1, 2])
-    with col_genre:
-        trend_genre = st.text_input(
-            "🏷️ ジャンル・カテゴリ名",
-            placeholder="例：スマートフォン",
-            help="同じジャンル名で繰り返し分析するとトレンドグラフが育ちます",
-        )
-        trend_industry = st.text_input(
-            "🏢 業種（任意）",
-            placeholder="例：EC / 不動産 / SaaS",
-            key="trend_industry",
-        )
+    col_kws, col_opts = st.columns([2, 1])
     with col_kws:
         trend_keywords_input = st.text_area(
-            "🔑 キーワードを入力（1行に1つ・最大10件）",
-            height=130,
-            placeholder="格安スマホ 乗り換え\niPhone 購入\nスマホ 高級\nSIMフリー おすすめ",
+            "🔑 調べたいキーワードを入力（1行に1つ・最大5件）",
+            height=140,
+            placeholder="格安スマホ\niPhone\nSIMフリー\nスマホ 乗り換え\nアンドロイド",
+            help="Google Trendsは1回のリクエストで最大5キーワードまで比較できます",
         )
- 
+    with col_opts:
+        timeframe_option = st.selectbox(
+            "📅 期間を選択",
+            options=[
+                ("直近1ヶ月",  "today 1-m"),
+                ("直近3ヶ月",  "today 3-m"),
+                ("直近12ヶ月", "today 12-m"),
+                ("直近5年",    "today 5-y"),
+            ],
+            format_func=lambda x: x[0],
+            index=1,
+        )
+        st.markdown("<br>", unsafe_allow_html=True)
+        trend_run = st.button("🔍 市場トレンドを取得", type="primary", use_container_width=True)
+        st.caption("※ Google Trendsへのアクセスのため\n取得に10〜20秒かかります")
+
     trend_kw_list = [k.strip() for k in trend_keywords_input.strip().splitlines() if k.strip()]
-    col_info, col_run = st.columns([3,1])
-    with col_info:
-        st.caption(f"ジャンル: **{trend_genre or '未入力'}**　キーワード数: **{len(trend_kw_list)}件**")
-    with col_run:
-        trend_run = st.button("📈 トレンド分析開始", type="primary", use_container_width=True)
- 
+
     if trend_run:
-        if not api_key:
-            st.error("⚠️ サイドバーにAPIキーを入力してください。")
-        elif not trend_genre:
-            st.warning("⚠️ ジャンル・カテゴリ名を入力してください。")
-        elif not trend_kw_list:
+        if not trend_kw_list:
             st.warning("⚠️ キーワードを1つ以上入力してください。")
         else:
-            if len(trend_kw_list) > 10:
-                st.warning("⚠️ 最初の10件を分析します。")
-                trend_kw_list = trend_kw_list[:10]
-            with st.spinner(f"「{trend_genre}」のトレンドを分析中..."):
+            if len(trend_kw_list) > 5:
+                st.warning("⚠️ 最初の5件を取得します。")
+                trend_kw_list = trend_kw_list[:5]
+
+            with st.spinner("📡 Google Trendsから日本市場データを取得中...（10〜20秒かかります）"):
                 try:
-                    client     = get_client(api_key)
-                    trend_result = analyze_trend_keywords(client, trend_genre, trend_kw_list)
-                    session_id = save_trend_session(trend_genre, trend_result)
-                    st.session_state["trend_result"] = trend_result
-                    st.session_state["trend_genre"]  = trend_genre
-                    st.success(f"✅ 「{trend_genre}」の分析完了！DBに保存しました（ID: {session_id}）")
+                    from market_trend import fetch_market_trends
+                    market_data = fetch_market_trends(
+                        trend_kw_list,
+                        timeframe=timeframe_option[1],
+                    )
+                    st.session_state["market_data"]     = market_data
+                    st.session_state["market_keywords"] = trend_kw_list
+                    st.success(f"✅ データ取得完了！（取得日時: {market_data['fetched_at']}）")
                 except Exception as e:
-                    st.error(f"分析中にエラーが発生しました: {e}")
- 
-    st.markdown("---")
- 
-    # ---- 最新分析結果の表示 ----
-    if "trend_result" in st.session_state:
-        tr     = st.session_state["trend_result"]
-        tgenre = st.session_state.get("trend_genre","")
- 
-        # ジャンルサマリー
-        trend_label = TREND_BADGE.get(tr.get("genre_trend",""), "")
-        st.markdown(
-            f'<div class="trend-insight-box">'
-            f'<div style="font-size:16px;font-weight:800;margin-bottom:8px;">'
-            f'📊 {tgenre} &nbsp; {trend_label} &nbsp;'
-            f'<span style="font-size:22px;color:#3b82f6;">平均スコア {tr.get("genre_avg_score",0)}/10</span>'
-            f'</div>'
-            f'<div>{tr.get("genre_summary","")}</div>'
-            f'<div style="margin-top:10px;font-weight:700;">🤖 AIインサイト：{tr.get("ai_insight","")}</div>'
-            f'</div>',
-            unsafe_allow_html=True,
-        )
- 
-        # 注目キーワード
-        top_kw     = tr.get("top_keyword","")
-        rising_kw  = tr.get("rising_keyword","")
-        if top_kw or rising_kw:
-            hc1,hc2 = st.columns(2)
-            with hc1:
+                    st.error(f"データ取得中にエラーが発生しました: {e}")
+                    st.info("Google Trendsへのアクセスが一時的に制限されている場合があります。1〜2分後に再試行してください。")
+
+    # ---- 取得済みデータの表示 ----
+    if "market_data" not in st.session_state:
+        show_empty_state("📈", "市場トレンドデータがありません",
+            "キーワードを入力して「市場トレンドを取得」を押してください。\nGoogle Trendsの実データで日本市場の検索ボリューム推移を表示します。")
+    else:
+        market_data = st.session_state["market_data"]
+        kws         = st.session_state.get("market_keywords", [])
+        trend_df    = market_data.get("trend_df", pd.DataFrame())
+        summaries   = market_data.get("summaries", [])
+
+        # ---- サマリーカード ----
+        st.markdown('<p class="section-title">📊 キーワード別サマリー</p>', unsafe_allow_html=True)
+
+        if summaries:
+            cols = st.columns(len(summaries))
+            trend_icons = {"上昇": "📈", "横ばい": "➡️", "下降": "📉"}
+            trend_colors = {"上昇": "#10b981", "横ばい": "#f59e0b", "下降": "#ef4444"}
+
+            for i, s in enumerate(summaries):
+                trend      = s.get("trend", "")
+                icon       = trend_icons.get(trend, "")
+                color      = trend_colors.get(trend, "#64748b")
+                change_pct = s.get("change_pct", 0)
+                change_str = f"+{change_pct}%" if change_pct >= 0 else f"{change_pct}%"
+
+                with cols[i]:
+                    st.markdown(
+                        f'<div style="background:white;border-radius:12px;padding:16px;'
+                        f'border:1px solid #e8eaf0;box-shadow:0 2px 8px rgba(0,0,0,0.05);'
+                        f'text-align:center;">'
+                        f'<div style="font-size:12px;color:#64748b;margin-bottom:4px;">{s["keyword"][:12]}</div>'
+                        f'<div style="font-size:24px;font-weight:800;color:{color};">{icon} {trend}</div>'
+                        f'<div style="font-size:13px;color:{color};font-weight:600;">{change_str}</div>'
+                        f'<div style="font-size:11px;color:#94a3b8;margin-top:4px;">'
+                        f'最新値: {s["latest"]} | 平均: {s["avg"]}</div>'
+                        f'<div style="font-size:11px;color:#94a3b8;">ピーク: {s["peak_date"]}</div>'
+                        f'</div>',
+                        unsafe_allow_html=True,
+                    )
+        else:
+            st.info("サマリーデータがありません。")
+
+        st.markdown("---")
+
+        # ---- 時系列グラフ（メイン） ----
+        if not trend_df.empty:
+            st.markdown('<p class="section-title">📈 検索ボリューム推移（Google Trends）</p>', unsafe_allow_html=True)
+
+            colors_list = ["#6366f1","#10b981","#f59e0b","#ef4444","#8b5cf6"]
+            fig = go.Figure()
+
+            for i, kw in enumerate(kws):
+                if kw in trend_df.columns:
+                    color = colors_list[i % len(colors_list)]
+                    fig.add_trace(go.Scatter(
+                        x=trend_df.index,
+                        y=trend_df[kw],
+                        mode="lines",
+                        name=kw,
+                        line=dict(color=color, width=2.5),
+                        fill="tozeroy",
+                        fillcolor=color.replace(")", ",0.05)").replace("rgb", "rgba") if "rgb" in color else color + "0d",
+                        hovertemplate=f"<b>{kw}</b><br>%{{x|%Y-%m-%d}}<br>人気度: %{{y}}<extra></extra>",
+                    ))
+
+            fig.update_layout(
+                title=dict(
+                    text="🇯🇵 日本市場 検索ボリューム推移（Google Trends・数値は相対的な人気度 0〜100）",
+                    font=dict(size=14, color="#1e293b"),
+                ),
+                xaxis=dict(title="日付", showgrid=True, gridcolor="#f1f5f9"),
+                yaxis=dict(title="検索人気度（0〜100）", range=[0, 105]),
+                plot_bgcolor="white",
+                paper_bgcolor="white",
+                margin=dict(l=20, r=20, t=70, b=40),
+                height=420,
+                hovermode="x unified",
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+            )
+            st.plotly_chart(fig, use_container_width=True)
+            st.caption("※ Google Trendsの数値は絶対的な検索数ではなく、期間内の最高値を100とした相対的な人気度です。")
+
+        st.markdown("---")
+
+        # ---- 地域別ヒートマップ ----
+        region_df = market_data.get("region_df", pd.DataFrame())
+        if not region_df.empty:
+            st.markdown('<p class="section-title">🗾 都道府県別 検索人気度</p>', unsafe_allow_html=True)
+
+            # 最初のキーワードで地域別グラフを作成
+            first_kw = kws[0] if kws else ""
+            if first_kw and first_kw in region_df.columns:
+                top_regions = region_df[first_kw].sort_values(ascending=False).head(15)
+                rg1, rg2 = st.columns([2, 1])
+                with rg1:
+                    fig_region = go.Figure(go.Bar(
+                        x=top_regions.values,
+                        y=top_regions.index,
+                        orientation="h",
+                        marker=dict(color="#6366f1"),
+                        text=top_regions.values,
+                        textposition="outside",
+                        hovertemplate="<b>%{y}</b><br>人気度: %{x}<extra></extra>",
+                    ))
+                    fig_region.update_layout(
+                        title=dict(text=f"🗾 「{first_kw}」の都道府県別 検索人気度 TOP15",
+                                   font=dict(size=13, color="#1e293b")),
+                        xaxis=dict(range=[0, 115], title="人気度"),
+                        yaxis=dict(autorange="reversed"),
+                        plot_bgcolor="white", paper_bgcolor="white",
+                        margin=dict(l=20, r=60, t=50, b=30),
+                        height=420, showlegend=False,
+                    )
+                    fig_region.update_xaxes(showgrid=True, gridcolor="#f1f5f9")
+                    st.plotly_chart(fig_region, use_container_width=True)
+
+                with rg2:
+                    st.markdown(
+                        '<div class="insight-card"><div class="insight-card-title">🗾 地域別 インサイト</div>',
+                        unsafe_allow_html=True,
+                    )
+                    top3 = top_regions.head(3)
+                    for region, val in top3.items():
+                        st.markdown(
+                            f'<div class="insight-item">'
+                            f'<span class="insight-icon">📍</span>'
+                            f'<div><b>{region}</b>: 人気度 {val}</div>'
+                            f'</div>',
+                            unsafe_allow_html=True,
+                        )
+                    st.markdown('</div>', unsafe_allow_html=True)
+                    st.caption("※ 最も検索している地域が100、それに対する相対値で表示")
+
+            st.markdown("---")
+
+        # ---- 関連キーワード ----
+        related_queries = market_data.get("related_queries", {})
+        if related_queries:
+            st.markdown('<p class="section-title">🔗 関連キーワード（Google Trends）</p>', unsafe_allow_html=True)
+            st.caption("実際にこのキーワードと一緒に検索されているワードです。広告キーワードの拡張に活用できます。")
+
+            rq_cols = st.columns(min(len(related_queries), 3))
+            for i, (kw, queries) in enumerate(related_queries.items()):
+                with rq_cols[i % 3]:
+                    st.markdown(
+                        f'<div class="insight-card">'
+                        f'<div class="insight-card-title">🔍 「{kw}」の関連キーワード</div>',
+                        unsafe_allow_html=True,
+                    )
+                    if queries:
+                        for q in queries[:5]:
+                            query_text = q.get("query", "")
+                            value      = q.get("value", "")
+                            st.markdown(
+                                f'<div class="insight-item">'
+                                f'<span class="insight-icon">🔎</span>'
+                                f'<div>{query_text} '
+                                f'<span style="color:#6366f1;font-size:11px;">({value}%)</span>'
+                                f'</div></div>',
+                                unsafe_allow_html=True,
+                            )
+                    else:
+                        st.caption("関連キーワードが見つかりませんでした")
+                    st.markdown('</div>', unsafe_allow_html=True)
+
+            st.markdown("---")
+
+        # ---- 最新ニュース ----
+        news_data = market_data.get("news", {})
+        if news_data:
+            st.markdown('<p class="section-title">📰 最新ニュース（Google News）</p>', unsafe_allow_html=True)
+            st.caption("このキーワードに関する日本の最新ニュースです。市場の動きを把握するのに役立ちます。")
+
+            for kw, news_list in news_data.items():
+                if not news_list:
+                    continue
+                st.markdown(f"**🔍 「{kw}」のニュース**")
+                for news in news_list:
+                    title   = news.get("title", "")
+                    link    = news.get("link", "")
+                    pubdate = news.get("pubDate", "")
+                    st.markdown(
+                        f'<div class="insight-item">'
+                        f'<span class="insight-icon">📰</span>'
+                        f'<div>'
+                        f'<a href="{link}" target="_blank" style="color:#3730a3;font-weight:600;text-decoration:none;">{title}</a>'
+                        f'<div style="font-size:11px;color:#94a3b8;margin-top:2px;">{pubdate}</div>'
+                        f'</div></div>',
+                        unsafe_allow_html=True,
+                    )
+                st.markdown("")
+
+        st.markdown("---")
+
+        # ---- AI分析（オプション） ----
+        st.markdown('<p class="section-title">🤖 AIによる市場トレンド分析</p>', unsafe_allow_html=True)
+        st.caption("取得したGoogle Trendsデータをもとに、AIが市場動向と広告戦略を分析します。")
+
+        if not api_key:
+            st.warning("⚠️ サイドバーにAPIキーを入力すると、AIによる分析ができます。")
+        else:
+            if st.button("🤖 AIで市場トレンドを分析する", type="primary"):
+                with st.spinner("AIが市場データを分析中..."):
+                    try:
+                        # サマリーデータをAIに渡す
+                        summary_text = "\n".join([
+                            f"- {s['keyword']}: 人気度平均{s['avg']}、{s['trend']}トレンド（{s['change_pct']:+.1f}%）、ピーク日{s['peak_date']}"
+                            for s in summaries
+                        ])
+                        news_text = ""
+                        for kw, news_list in news_data.items():
+                            for n in news_list[:2]:
+                                news_text += f"- {n['title']}\n"
+
+                        from openai import OpenAI
+                        oa_client = OpenAI(api_key=api_key)
+                        response  = oa_client.chat.completions.create(
+                            model="gpt-4o-mini",
+                            messages=[
+                                {"role": "system", "content": "あなたは日本市場のデジタルマーケティング専門家です。"},
+                                {"role": "user", "content": f"""
+以下のGoogle Trendsデータと最新ニュースをもとに、日本市場のトレンドを分析してください。
+
+【Google Trends サマリー】
+{summary_text}
+
+【最新ニュース】
+{news_text}
+
+以下の観点で分析し、マーケターが今すぐ使える具体的な提言を日本語で述べてください：
+1. 市場全体のトレンド解説（2〜3文）
+2. 注目すべきキーワードとその理由
+3. 広告・コンテンツ戦略への提言（3点）
+4. 今後1〜3ヶ月の市場予測
+"""},
+                            ],
+                            temperature=0.7,
+                            max_tokens=800,
+                        )
+                        ai_comment = response.choices[0].message.content
+                        st.session_state["market_ai_comment"] = ai_comment
+                    except Exception as e:
+                        st.error(f"AI分析中にエラーが発生しました: {e}")
+
+            if "market_ai_comment" in st.session_state:
                 st.markdown(
-                    f'<div class="insight-card">'
-                    f'<div class="insight-card-title">🏆 最も購買意欲が高いキーワード</div>'
-                    f'<div style="font-size:20px;font-weight:800;color:#6366f1;">{top_kw}</div>'
+                    f'<div class="trend-insight-box">'
+                    f'🤖 AI市場分析：<br><br>'
+                    f'{st.session_state["market_ai_comment"].replace(chr(10), "<br>")}'
                     f'</div>',
                     unsafe_allow_html=True,
                 )
-            with hc2:
-                st.markdown(
-                    f'<div class="insight-card">'
-                    f'<div class="insight-card-title">🚀 最も上昇トレンドのキーワード</div>'
-                    f'<div style="font-size:20px;font-weight:800;color:#10b981;">{rising_kw}</div>'
-                    f'</div>',
-                    unsafe_allow_html=True,
-                )
- 
-        # キーワード一覧テーブル
-        st.markdown('<p class="section-title">📋 キーワード別 分析結果</p>', unsafe_allow_html=True)
-        kw_rows = []
-        for kw in tr.get("keywords",[]):
-            trend_val = kw.get("trend","")
-            badge     = TREND_BADGE.get(trend_val, trend_val)
-            kw_rows.append({
-                "キーワード":   kw.get("keyword",""),
-                "購買意欲":     kw.get("purchase_score",""),
-                "検索意図":     kw.get("search_intent",""),
-                "価格帯":       kw.get("price_segment",""),
-                "トレンド":     trend_val,
-                "トレンド理由": kw.get("trend_reason",""),
-            })
-        kw_df = pd.DataFrame(kw_rows)
-        st.dataframe(kw_df, use_container_width=True, hide_index=True)
- 
-    st.markdown("---")
- 
-    # ---- 保存済みジャンルの選択と時系列グラフ ----
-    st.markdown('<p class="section-title">📊 ジャンル別 時系列グラフ</p>', unsafe_allow_html=True)
-    all_genres = get_all_genres()
- 
-    if not all_genres:
-        show_empty_state("📈","まだトレンドデータがありません",
-            "上のフォームでジャンルとキーワードを入力して「トレンド分析開始」を押してください。\n同じジャンルを繰り返し分析するとグラフが育ちます。")
-    else:
-        selected_genre = st.selectbox(
-            "表示するジャンルを選択",
-            options=all_genres,
-            help="同じジャンルで複数回分析すると時系列グラフが表示されます",
-        )
- 
-        if selected_genre:
-            trend_data = get_trend_keywords_by_genre(selected_genre)
- 
-            if trend_data:
-                # 時系列グラフ
-                st.plotly_chart(
-                    make_trend_line_chart(trend_data, selected_genre),
-                    use_container_width=True,
-                )
-                st.markdown("---")
- 
-                # ヒートマップ＋ランキング
-                hm1, hm2 = st.columns([2,1])
-                with hm1:
-                    st.plotly_chart(
-                        make_heatmap_chart(trend_data, selected_genre),
-                        use_container_width=True,
-                    )
-                with hm2:
-                    st.plotly_chart(
-                        make_ranking_chart(trend_data, selected_genre),
-                        use_container_width=True,
-                    )
-            else:
-                st.info(f"「{selected_genre}」のトレンドデータがまだありません。")
- 
-    st.markdown("---")
- 
-    # ---- ジャンル比較グラフ ----
-    st.markdown('<p class="section-title">🌐 ジャンル比較グラフ</p>', unsafe_allow_html=True)
-    genre_scores = get_genre_avg_scores()
- 
-    if len(genre_scores) >= 2:
-        st.plotly_chart(
-            make_genre_compare_chart(genre_scores),
-            use_container_width=True,
-        )
-        st.caption("🟢 7点以上: 購買意欲高　🟡 4〜6点: 普通　🔴 3点以下: 低め")
-    elif len(genre_scores) == 1:
-        st.info("ジャンルが1つだけです。2つ以上のジャンルを分析するとここに比較グラフが表示されます。")
-    else:
-        st.info("まだジャンルデータがありません。トレンド分析を実行してください。")
- 
-    # ---- 分析履歴一覧 ----
-    st.markdown("---")
-    st.markdown('<p class="section-title">🗄️ トレンド分析履歴</p>', unsafe_allow_html=True)
-    trend_sessions = get_trend_sessions()
-    if trend_sessions:
-        hist_rows = []
-        for s in trend_sessions:
-            hist_rows.append({
-                "分析日時":       s.get("created_at",""),
-                "ジャンル":       s.get("genre",""),
-                "キーワード数":   f"{s.get('kw_count',0)}件",
-                "平均スコア":     f"{s.get('avg_score',0):.1f}/10",
-                "ジャンルトレンド": s.get("genre_trend",""),
-                "AIインサイト":   s.get("ai_insight",""),
-            })
-        st.dataframe(pd.DataFrame(hist_rows), use_container_width=True, hide_index=True)
-    else:
-        st.info("まだトレンド分析履歴がありません。")
- 
  
 # =====================================
 # タブ⑤：CSV分析
