@@ -1,9 +1,13 @@
 """
-trend_analyzer.py - 拡張版
+trend_analyzer.py  v3.0
+既存関数:
+  - analyze_trend_keywords() : app.py からインポートされる既存関数（互換性維持）
+
 追加機能:
-  - predict_trend()        : 線形回帰によるトレンド予測
-  - generate_heatmap_data(): 曜日×時間帯ヒートマップ用データ生成
-  - analyze_by_age_group() : OpenAI API による年代別傾向分析
+  - predict_trend()          : 線形回帰によるトレンド予測
+  - generate_heatmap_data()  : 曜日×時間帯ヒートマップ用データ生成
+  - analyze_by_age_group()   : OpenAI API による年代別傾向分析
+  - build_age_groups()       : 年代グループ定義のヘルパー
 """
 
 import numpy as np
@@ -15,12 +19,25 @@ import re
 
 
 # ──────────────────────────────────────────────
+# 0. 既存関数（app.py との互換性維持）
+# ──────────────────────────────────────────────
+
+def analyze_trend_keywords(keywords: list, api_key: str = "", **kwargs) -> dict:
+    """
+    既存の app.py が import している関数。
+    現在は app.py 内で直接呼び出されていないが、
+    ImportError を防ぐために定義を維持する。
+    """
+    return {}
+
+
+# ──────────────────────────────────────────────
 # 1. トレンド予測（線形回帰 + 信頼区間）
 # ──────────────────────────────────────────────
 
 def predict_trend(
-    dates: list[str],
-    values: list[float],
+    dates: list,
+    values: list,
     forecast_weeks: int = 12,
 ) -> dict:
     """
@@ -105,7 +122,7 @@ def predict_trend(
 
 def generate_heatmap_data(
     keyword: str,
-    trends_weekly: list[float] | None = None,
+    trends_weekly: list = None,
 ) -> dict:
     """
     曜日 × 時間帯のヒートマップ用データを生成する。
@@ -266,9 +283,9 @@ JSON 以外のテキストは一切出力しないでください。
 # ──────────────────────────────────────────────
 
 def build_age_groups(
-    ranges: list[tuple[int, int]],
-    labels: list[str] | None = None,
-) -> list[dict]:
+    ranges: list,
+    labels: list = None,
+) -> list:
     """
     年代グループ定義を生成するヘルパー。
 
