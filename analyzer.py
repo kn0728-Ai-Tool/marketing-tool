@@ -1,6 +1,13 @@
-# analyzer.py  v2.3
-# AI分析ロジック強化版
-# 価格帯別プロンプト・ペルソナ・LP提案・CTA生成
+# analyzer.py  v2.0
+# =====================================
+# AI分析ロジック 強化版
+#
+# 変更点：
+# - 価格帯ごとに専用プロンプトを用意
+# - 広告文に必須ルールを組み込む
+# - 感情分析・競合ポジション分析を追加
+# - 業種を指定して分析精度を上げる
+# =====================================
 
 import json
 import time
@@ -8,72 +15,78 @@ from openai import OpenAI
 
 
 # =====================================
-# 価格帯別の訴求ルール定義
-# AIへの指示に組み込む「戦略マニュアル」
+# 価格帯ごとの広告文ルール定義
+# ここを変えるだけで全体の広告文の傾向が変わる
 # =====================================
 SEGMENT_RULES = {
     "Budget": {
-        "description": "コスパ重視・価格優先のユーザー層",
+        "description": "コストパフォーマンスを最重視する価格重視層",
         "must_include": [
-            "具体的な金額・割引率・節約額を必ず入れる",
-            "「最安値」「割引」「お得」「節約」などコスパ訴求ワードを使う",
-            "数字で価値を示す（例：月額980円、70%OFF）",
-            "即決を促すCTAを使う（今すぐ・期間限定）",
+            "具体的な数字（価格・割引率・○○%OFF など）を必ず入れる",
+            "「最安」「格安」「節約」「お得」「割引」などのコスト訴求ワードを使う",
+            "今すぐ行動させる緊急性（「今だけ」「期間限定」など）を入れる",
         ],
         "must_avoid": [
-            "「高級」「プレミアム」「ラグジュアリー」などの高価格帯ワード",
-            "抽象的な品質訴求（こだわり・職人など）",
-            "価格を曖昧にする表現",
+            "高級感・ブランド感を出す表現は避ける",
+            "抽象的な品質訴求（「高品質」「上質な」など）は避ける",
         ],
-        "persona": "20〜40代・価格を最重視・比較サイトをよく見る・節約志向",
-        "cta_style": "今すぐ無料で試す / 最安値を確認する / 限定割引を受け取る",
+        "tone": "シンプル・直接的・数字重視",
+        "example_titles": ["最安値で手に入れる", "今だけ50%OFF", "節約するならここ"],
     },
     "Standard": {
-        "description": "機能・信頼性・コスパバランスを重視するユーザー層",
+        "description": "コストと品質のバランスを重視する標準層",
         "must_include": [
-            "信頼性・実績・利用者数などの安心感を示す数字",
-            "「人気No.1」「選ばれる理由」「満足度〇〇%」など",
-            "機能・スペックの具体的なメリット",
-            "バランスの良さを訴求する",
+            "信頼性・実績を示す数字（「利用者数○万人」「満足度○%」など）を入れる",
+            "機能・使いやすさ・安心感を訴求する",
+            "「選ばれる理由」「多くの方に支持」などの共感訴求を使う",
         ],
         "must_avoid": [
-            "極端な低価格訴求（Budget層と混同されるため）",
-            "過度な高級感（ターゲットに響かない）",
+            "極端な最安値訴求は避ける（安っぽく見える）",
+            "高すぎるブランド訴求は避ける（届かない印象になる）",
         ],
-        "persona": "30〜50代・機能と価格のバランスを重視・口コミや評価を参考にする",
-        "cta_style": "詳しく見る / 無料で資料請求 / 人気プランを確認する",
+        "tone": "親しみやすい・安心感・実績重視",
+        "example_titles": ["選ばれ続ける理由がある", "安心と品質を両立", "満足度98%の実績"],
     },
     "Premium": {
-        "description": "品質・体験・専門性を重視する高単価志向のユーザー層",
+        "description": "品質・体験・専門性を重視する高品質志向層",
         "must_include": [
-            "品質・素材・製法などの「こだわり」を具体的に示す",
-            "専門家・プロの監修・受賞歴などの権威性",
-            "体験・ライフスタイルの向上を訴求する",
-            "顧客サポートの充実を示す",
+            "品質・素材・技術の優位性を具体的に表現する",
+            "「プロ」「専門」「こだわり」「本格」などの専門性ワードを使う",
+            "購入後の体験・ライフスタイルの変化を想起させる表現を使う",
         ],
         "must_avoid": [
-            "「安い」「格安」「割引」など価格訴求ワード",
-            "大衆向けの表現（誰でも・簡単すぎる）",
+            "価格の安さ・割引訴求は一切避ける",
+            "大衆的・汎用的な表現は避ける（特別感が薄れる）",
         ],
-        "persona": "30〜50代・品質に対して適切な対価を払う・レビューより専門家の意見を重視",
-        "cta_style": "今すぐ相談する / 無料カウンセリングを予約 / 限定体験を申し込む",
+        "tone": "洗練・専門的・体験訴求",
+        "example_titles": ["本物を知る人が選ぶ", "プロも認める品質", "上質な体験を毎日に"],
     },
     "Luxury": {
-        "description": "ブランド・希少性・ステータスを最重視する超高単価層",
+        "description": "ブランド・希少性・ステータスを重視する高級志向層",
         "must_include": [
-            "希少性・限定感（数量限定・会員限定・招待制）",
-            "ブランドのストーリーや歴史・哲学",
-            "他では得られない特別な体験・価値",
-            "エクスクルーシブな表現（選ばれた・特別な）",
+            "希少性・限定性を強調する（「限定」「選ばれた」「唯一」など）",
+            "ブランドストーリー・歴史・職人技など感情に訴える表現を使う",
+            "ステータス・自己表現・特別な体験を想起させる言葉を使う",
         ],
         "must_avoid": [
-            "価格訴求・割引・コスパなどの表現",
-            "大量販売を連想させる表現（誰でも・全員に）",
-            "安さを示す数字",
+            "価格・割引に関する表現は絶対に避ける",
+            "大量生産・汎用品を想起させる表現は避ける",
+            "数字による訴求（利用者数など）は避ける（希少感が薄れる）",
         ],
-        "persona": "40〜60代・価格より価値を重視・ブランドへの帰属意識が高い・口コミより実績を重視",
-        "cta_style": "特別メンバーに申し込む / 限定コレクションを見る / プライベート相談を予約",
+        "tone": "格調・物語性・感情訴求・詩的な表現",
+        "example_titles": ["選ばれた人だけの体験", "時を超えた本物の価値", "あなただけの物語"],
     },
+}
+
+
+# =====================================
+# 検索意図ごとの分析ヒント
+# =====================================
+INTENT_HINTS = {
+    "購買直前":     "ユーザーは今すぐ購入したい状態。CTAを強く・障壁を取り除く訴求が有効。",
+    "比較検討段階": "ユーザーは複数の選択肢を比較中。他社との差別化・選ぶ理由を明示するのが有効。",
+    "情報収集":     "ユーザーはまだ初期段階。まず興味を持たせ、次のステップへ誘導する訴求が有効。",
+    "価格調査":     "ユーザーは価格を比べている。価格の透明性・コスパの明示・特典訴求が有効。",
 }
 
 
@@ -82,126 +95,139 @@ def get_client(api_key: str) -> OpenAI:
     return OpenAI(api_key=api_key)
 
 
-def analyze_keyword_structured(client: OpenAI, keyword: str) -> dict:
+def build_analysis_prompt(keyword: str, industry: str = "") -> str:
     """
-    キーワード1件をAI分析する（強化版）
-    価格帯判定 → 価格帯別の専用プロンプトで広告文・ペルソナ・LP提案・CTAを生成
+    キーワードと業種から分析プロンプトを生成する。
+    まず検索意図と価格帯を推定し、その結果に合わせた
+    専用ルールで広告文を生成する2段階構造。
     """
 
-    # ---- Step 1: まず価格帯と基本情報を判定 ----
-    step1_prompt = f"""
-あなたはGoogle広告のプロフェッショナルです。
-以下のキーワードを分析し、必ずJSON形式のみで回答してください。
+    # 業種の補足情報
+    industry_context = f"業種・ジャンル: {industry}\n" if industry else ""
 
-【キーワード】: {keyword}
+    # 各価格帯のルールをプロンプトに組み込む
+    segment_rules_text = ""
+    for seg, rules in SEGMENT_RULES.items():
+        must_include = "\n".join([f"    - {r}" for r in rules["must_include"]])
+        must_avoid   = "\n".join([f"    - {r}" for r in rules["must_avoid"]])
+        examples     = "・".join(rules["example_titles"])
+        segment_rules_text += f"""
+  【{seg}層 ({rules['description']})】
+    トーン: {rules['tone']}
+    必須要素:
+{must_include}
+    避けること:
+{must_avoid}
+    タイトル例: {examples}
+"""
+
+    prompt = f"""
+あなたはGoogle広告のエキスパートです。
+以下のキーワードを深く分析し、価格帯層に最適化された広告文を生成してください。
+
+{industry_context}【分析キーワード】: {keyword}
+
+## 価格帯別 広告文ルール
+{segment_rules_text}
+
+## 検索意図ごとの訴求ヒント
+- 購買直前    : {INTENT_HINTS['購買直前']}
+- 比較検討段階: {INTENT_HINTS['比較検討段階']}
+- 情報収集    : {INTENT_HINTS['情報収集']}
+- 価格調査    : {INTENT_HINTS['価格調査']}
+
+## 出力形式
+必ずJSON形式のみで回答してください。説明文・前置き・```は不要です。
 
 {{
   "keyword": "{keyword}",
   "search_intent": "比較検討段階 / 購買直前 / 情報収集 / 価格調査 のどれか1つ",
-  "intent_reason": "理由を25文字以内で",
+  "intent_reason": "理由を30文字以内で",
   "price_segment": "Budget / Standard / Premium / Luxury のどれか1つ",
-  "segment_reason": "理由を25文字以内で",
-  "purchase_score": 購買意欲スコア1〜10の整数
-}}
-"""
-
-    step1_res = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[{"role": "user", "content": step1_prompt}],
-        temperature=0.3,  # 判定は低温度で安定させる
-    )
-    step1_raw = _extract_json(step1_res.choices[0].message.content)
-    base_data = json.loads(step1_raw)
-
-    # 価格帯に対応するルールを取得
-    segment = base_data.get("price_segment", "Standard")
-    rules   = SEGMENT_RULES.get(segment, SEGMENT_RULES["Standard"])
-
-    # ---- Step 2: 価格帯別の専用プロンプトで詳細生成 ----
-    must_include = "\n".join([f"  - {r}" for r in rules["must_include"]])
-    must_avoid   = "\n".join([f"  - {r}" for r in rules["must_avoid"]])
-
-    step2_prompt = f"""
-あなたはGoogle広告の専門コピーライターです。
-以下の条件に厳密に従って広告コンテンツを生成してください。
-
-【キーワード】: {keyword}
-【ターゲット層】: {segment}（{rules['description']}）
-【ターゲットペルソナ】: {rules['persona']}
-
-【必ず含めること】:
-{must_include}
-
-【絶対に避けること】:
-{must_avoid}
-
-以下のJSON形式のみで回答してください。説明文や前置きは不要です。
-
-{{
+  "segment_reason": "理由を30文字以内で",
+  "purchase_score": 購買意欲スコア1〜10の整数,
+  "emotion": "このキーワードで検索するユーザーの感情を20文字以内で（例: 節約したい・焦り・憧れ）",
+  "competitor_position": "競合との差別化ポイントを30文字以内で",
   "ad_copies": [
     {{
-      "title": "広告タイトル（15文字以内・{segment}層向け）",
-      "description": "広告説明文（45文字以内・{segment}層の訴求ルールに従う）",
-      "appeal_point": "この広告文の主な訴求ポイントを10文字以内で"
+      "title": "このキーワードの価格帯層ルールに従ったタイトル（15文字以内）",
+      "description": "このキーワードの価格帯層ルールに従った説明文（45文字以内）",
+      "appeal_point": "この広告文の最大の訴求ポイントを15文字以内で"
     }},
     {{
-      "title": "広告タイトル（15文字以内・角度を変えた別訴求）",
-      "description": "広告説明文（45文字以内）",
-      "appeal_point": "この広告文の主な訴求ポイントを10文字以内で"
+      "title": "別アプローチのタイトル（15文字以内）",
+      "description": "別アプローチの説明文（45文字以内）",
+      "appeal_point": "この広告文の最大の訴求ポイントを15文字以内で"
     }},
     {{
-      "title": "広告タイトル（15文字以内・感情に訴える訴求）",
-      "description": "広告説明文（45文字以内）",
-      "appeal_point": "この広告文の主な訴求ポイントを10文字以内で"
+      "title": "3つ目のアプローチのタイトル（15文字以内）",
+      "description": "3つ目のアプローチの説明文（45文字以内）",
+      "appeal_point": "この広告文の最大の訴求ポイントを15文字以内で"
     }}
   ],
-  "persona": {{
-    "age": "想定年齢層（例：30〜40代）",
-    "mindset": "購買時の心理状態を30文字以内で",
-    "pain_point": "最大の悩み・課題を30文字以内で",
-    "trigger": "購買の決め手になる要素を30文字以内で"
-  }},
-  "cta_suggestions": [
-    "{rules['cta_style'].split('/')[0].strip()}",
-    "{rules['cta_style'].split('/')[1].strip() if '/' in rules['cta_style'] else rules['cta_style']}",
-    "キーワードに合わせたオリジナルCTAを1つ"
-  ],
-  "lp_suggestions": [
-    "LP改善提案1: ファーストビューに入れるべき要素を具体的に30文字以内で",
-    "LP改善提案2: {segment}層が離脱しないコンテンツ構成を30文字以内で",
-    "LP改善提案3: CVRを上げるために最も重要な要素を30文字以内で"
-  ],
   "advice": "このキーワードで最も重要な広告改善ポイントを40文字以内で",
-  "competition_note": "この市場の競合状況と差別化ポイントを40文字以内で"
+  "lp_advice": "ランディングページで特に重視すべき点を40文字以内で",
+  "cta_suggestion": "最適なCTAボタンのテキストを10文字以内で（例: 今すぐ無料で試す）"
 }}
 """
+    return prompt
 
-    step2_res = client.chat.completions.create(
+
+def analyze_keyword_structured(
+    client: OpenAI,
+    keyword: str,
+    industry: str = "",
+) -> dict:
+    """
+    キーワード1件をAI分析してdictで返す。
+    industryを指定すると業種に合わせた分析になる。
+    """
+    prompt = build_analysis_prompt(keyword, industry)
+
+    response = client.chat.completions.create(
         model="gpt-4o-mini",
-        messages=[{"role": "user", "content": step2_prompt}],
-        temperature=0.7,
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "あなたはGoogle広告の第一人者です。"
+                    "価格帯別マーケティング戦略と検索意図分析の専門家として、"
+                    "実務で即使える広告文を生成してください。"
+                    "出力は必ずJSONのみ。前置きや説明は一切不要です。"
+                ),
+            },
+            {"role": "user", "content": prompt},
+        ],
+        temperature=0.75,   # 創造性を少し上げる
+        max_tokens=1200,    # 出力項目が増えたので余裕を持たせる
     )
-    step2_raw    = _extract_json(step2_res.choices[0].message.content)
-    detail_data  = json.loads(step2_raw)
 
-    # Step1 と Step2 の結果をマージ
-    return {**base_data, **detail_data}
+    raw = response.choices[0].message.content.strip()
+
+    # ```json〜``` で囲まれていても対応
+    if raw.startswith("```"):
+        raw = raw.split("```")[1]
+        if raw.startswith("json"):
+            raw = raw[4:]
+    raw = raw.strip()
+
+    return json.loads(raw)
 
 
-def analyze_keywords_batch(client: OpenAI, keywords: list) -> list:
-    """複数キーワードをまとめて分析"""
+def analyze_keywords_batch(
+    client: OpenAI,
+    keywords: list,
+    industry: str = "",
+) -> list:
+    """
+    キーワードリストをまとめて分析してリストで返す。
+    """
     results = []
     for kw in keywords:
         try:
-            data = analyze_keyword_structured(client, kw)
+            data = analyze_keyword_structured(client, kw, industry)
             results.append(data)
         except Exception as e:
             results.append({"keyword": kw, "error": str(e)})
-        time.sleep(0.8)  # 2ステップAPIコールのため少し長めに待つ
+        time.sleep(0.5)
     return results
-
-
-def _extract_json(raw: str) -> str:
-    """
-    AIの返答からJSONだけを取り出す。
-```json〜``` で囲まれていても対応。
