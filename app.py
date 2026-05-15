@@ -1,5 +1,5 @@
-# app.py  v2.5
-# 追加機能：CSVアップロード・AI自動分析・トレンド抽出
+# app.py  v2.6
+# 修正：st.stop() を全廃し、タブが空白になる問題を解消
  
 import streamlit as st
 import pandas as pd
@@ -21,14 +21,8 @@ from database import (
     delete_session, get_segment_stats,
 )
  
-# =====================================
-# DB初期化
-# =====================================
 init_db()
  
-# =====================================
-# ページ設定
-# =====================================
 st.set_page_config(
     page_title="🎯 AIキーワード分析ツール",
     page_icon="🎯",
@@ -36,9 +30,6 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
  
-# =====================================
-# カスタムCSS
-# =====================================
 st.markdown("""
 <style>
 html, body, [class*="css"] {
@@ -46,31 +37,19 @@ html, body, [class*="css"] {
 }
 .hero-banner {
   background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #06b6d4 100%);
-  border-radius: 16px;
-  padding: 36px 40px;
-  margin-bottom: 28px;
-  color: white;
-  position: relative;
-  overflow: hidden;
+  border-radius: 16px; padding: 36px 40px; margin-bottom: 28px;
+  color: white; position: relative; overflow: hidden;
 }
 .hero-banner::before {
-  content: '';
-  position: absolute;
-  top: -40px; right: -40px;
-  width: 200px; height: 200px;
-  background: rgba(255,255,255,0.08);
-  border-radius: 50%;
+  content: ''; position: absolute; top: -40px; right: -40px;
+  width: 200px; height: 200px; background: rgba(255,255,255,0.08); border-radius: 50%;
 }
 .hero-title { font-size:28px; font-weight:800; margin:0 0 8px; }
 .hero-sub   { font-size:14px; opacity:0.85; margin:0; line-height:1.6; }
 .hero-badge {
-  display: inline-block;
-  background: rgba(255,255,255,0.2);
-  border: 1px solid rgba(255,255,255,0.3);
-  border-radius: 20px;
-  padding: 3px 12px;
-  font-size: 12px;
-  margin-bottom: 12px;
+  display:inline-block; background:rgba(255,255,255,0.2);
+  border:1px solid rgba(255,255,255,0.3); border-radius:20px;
+  padding:3px 12px; font-size:12px; margin-bottom:12px;
 }
 .stTabs [data-baseweb="tab-list"] { gap:8px; border-bottom:2px solid #e2e8f0; }
 .stTabs [data-baseweb="tab"] {
@@ -149,6 +128,13 @@ html, body, [class*="css"] {
   font-size:18px; font-weight:700; color:#1e293b;
   margin:32px 0 16px; padding-left:12px; border-left:4px solid #6366f1;
 }
+.empty-state {
+  background:#f8fafc; border:2px dashed #c7d2fe; border-radius:16px;
+  padding:48px; text-align:center;
+}
+.empty-state-icon  { font-size:48px; margin-bottom:12px; }
+.empty-state-title { font-size:16px; font-weight:700; color:#6366f1; margin-bottom:8px; }
+.empty-state-desc  { font-size:13px; color:#64748b; }
 [data-testid="stSidebar"] { background:#1e293b !important; }
 [data-testid="stSidebar"] * { color:#e2e8f0 !important; }
 [data-testid="stSidebar"] .stTextInput input {
@@ -175,12 +161,23 @@ INTENT_EMOJI = {
     "比較検討段階":"🔍","購買直前":"🛒","情報収集":"📚","価格調査":"💰",
 }
  
-# =====================================
-# APIキー
-# =====================================
 api_key = ""
 if hasattr(st, "secrets"):
     api_key = st.secrets.get("OPENAI_API_KEY", "")
+ 
+ 
+# =====================================
+# ヘルパー：空状態の表示
+# =====================================
+def show_empty_state(icon: str, title: str, desc: str):
+    st.markdown(
+        f'<div class="empty-state">'
+        f'<div class="empty-state-icon">{icon}</div>'
+        f'<div class="empty-state-title">{title}</div>'
+        f'<div class="empty-state-desc">{desc}</div>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
  
  
 # =====================================
@@ -209,7 +206,6 @@ def make_score_bar_chart(valid):
     fig.update_yaxes(showgrid=False)
     return fig
  
- 
 def make_segment_pie_chart(seg_counts):
     labels = [f"{SEGMENT_INFO[s]['emoji']} {s}" for s,c in seg_counts.items() if c>0]
     values = [c for c in seg_counts.values() if c>0]
@@ -226,7 +222,6 @@ def make_segment_pie_chart(seg_counts):
         margin=dict(l=20,r=20,t=50,b=20), height=320,
     )
     return fig
- 
  
 def make_intent_bar_chart(valid):
     intent_counts = {}
@@ -251,7 +246,6 @@ def make_intent_bar_chart(valid):
     fig.update_xaxes(showgrid=False)
     return fig
  
- 
 def make_history_line_chart(history, keyword):
     dates  = [h.get("session_date","") for h in history]
     scores = [h.get("purchase_score",0) for h in history]
@@ -274,14 +268,11 @@ def make_history_line_chart(history, keyword):
     fig.update_yaxes(showgrid=True,gridcolor="#f1f5f9")
     return fig
  
- 
 def make_csv_bar_chart(df, x_col, y_col, title, color="#6366f1"):
     fig = go.Figure(go.Bar(
-        x=df[x_col].astype(str).str[:20],
-        y=df[y_col],
+        x=df[x_col].astype(str).str[:20], y=df[y_col],
         marker=dict(color=color),
-        text=df[y_col].round(2),
-        textposition="outside",
+        text=df[y_col].round(2), textposition="outside",
         hovertemplate=f"<b>%{{x}}</b><br>{y_col}: %{{y}}<extra></extra>",
     ))
     fig.update_layout(
@@ -297,7 +288,7 @@ def make_csv_bar_chart(df, x_col, y_col, title, color="#6366f1"):
  
  
 # =====================================
-# キーワードカード表示（共通関数）
+# キーワードカード表示
 # =====================================
 def render_keyword_cards(filtered: list):
     for r in filtered:
@@ -321,10 +312,8 @@ def render_keyword_cards(filtered: list):
             f'<span class="meta-chip">層の理由: {r.get("segment_reason","")}</span>'
             f'</div>'
             f'<div class="score-wrap">'
-            f'<div class="score-label">'
-            f'<span>購買意欲スコア</span>'
-            f'<span style="font-weight:700;color:{info["color"]};">{score} / 10</span>'
-            f'</div>'
+            f'<div class="score-label"><span>購買意欲スコア</span>'
+            f'<span style="font-weight:700;color:{info["color"]};">{score} / 10</span></div>'
             f'<div class="score-bg">'
             f'<div class="score-fill" style="width:{score*10}%;background:{info["color"]};"></div>'
             f'</div></div>'
@@ -339,37 +328,26 @@ def render_keyword_cards(filtered: list):
                 title_text   = ad.get("title","")
                 desc_text    = ad.get("description","")
                 appeal_point = ad.get("appeal_point","")
-                copy_text    = f"【タイトル】{title_text}\n【説明文】{desc_text}"
                 appeal_html  = f'<div class="ad-appeal">✨ {appeal_point}</div>' if appeal_point else ""
                 st.markdown(
-                    f'<div class="ad-card">'
-                    f'<div class="ad-num">案{i+1}</div>'
+                    f'<div class="ad-card"><div class="ad-num">案{i+1}</div>'
                     f'<div class="ad-title-text">{title_text}</div>'
                     f'<div class="ad-desc-text">{desc_text}</div>'
                     f'{appeal_html}</div>',
                     unsafe_allow_html=True,
                 )
                 with st.expander("📋 コピー", expanded=False):
-                    st.code(copy_text, language=None)
+                    st.code(f"【タイトル】{title_text}\n【説明文】{desc_text}", language=None)
  
         chips = ""
         if emotion:    chips += f'<span class="meta-chip">😊 感情: {emotion}</span>'
         if competitor: chips += f'<span class="meta-chip">⚔️ 差別化: {competitor}</span>'
         if cta:        chips += f'<span class="meta-chip">🖱️ CTA案: {cta}</span>'
         if chips:
-            st.markdown(
-                f'<div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0;">{chips}</div>',
-                unsafe_allow_html=True,
-            )
+            st.markdown(f'<div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0;">{chips}</div>', unsafe_allow_html=True)
         if lp_advice:
-            st.markdown(
-                f'<div class="lp-advice-box">🖥️ LP改善提案：{lp_advice}</div>',
-                unsafe_allow_html=True,
-            )
-        st.markdown(
-            f'<div class="advice-box">💡 アドバイス：{r.get("advice","")}</div><br>',
-            unsafe_allow_html=True,
-        )
+            st.markdown(f'<div class="lp-advice-box">🖥️ LP改善提案：{lp_advice}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="advice-box">💡 アドバイス：{r.get("advice","")}</div><br>', unsafe_allow_html=True)
  
  
 # =====================================
@@ -380,28 +358,20 @@ with st.sidebar:
     st.markdown("---")
     if not api_key:
         st.markdown("**🔑 APIキー設定**")
-        api_key = st.text_input(
-            "OpenAI APIキー", type="password",
-            placeholder="sk-proj-...", label_visibility="collapsed",
-        )
+        api_key = st.text_input("OpenAI APIキー", type="password",
+            placeholder="sk-proj-...", label_visibility="collapsed")
     else:
         st.markdown("**🔑 APIキー**")
         st.success("設定済み ✅")
     st.markdown("---")
     st.markdown("**📋 使い方**")
-    st.markdown(
-        "1. キーワード入力 or CSV アップロード\n"
-        "2. 「分析開始」をクリック\n"
-        "3. グラフ・改善提案を確認\n"
-        "4. レポートをダウンロード"
-    )
+    st.markdown("1. キーワード入力 or CSV アップロード\n2. 「分析開始」をクリック\n3. グラフ・改善提案を確認\n4. レポートをダウンロード")
     st.markdown("---")
     st.markdown("**💡 価格帯の目安**")
     for seg, info in SEGMENT_INFO.items():
         st.markdown(f"{info['emoji']} **{seg}**  \n{info['strategy']}\n")
     st.markdown("---")
-    st.caption("v2.5 | Powered by OpenAI")
- 
+    st.caption("v2.6 | Powered by OpenAI")
  
 # =====================================
 # ヒーローバナー
@@ -417,9 +387,8 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
  
- 
 # =====================================
-# タブ
+# タブ定義
 # =====================================
 tab_analyze, tab_result, tab_chart, tab_csv, tab_history, tab_guide = st.tabs([
     "🔍 キーワード分析",
@@ -437,53 +406,46 @@ tab_analyze, tab_result, tab_chart, tab_csv, tab_history, tab_guide = st.tabs([
 with tab_analyze:
     col_input, col_btn = st.columns([3,1])
     with col_input:
-        # CSVタブからキーワードが送られた場合は自動セット
         default_kw = st.session_state.pop("csv_keywords", "")
         keywords_input = st.text_area(
             "🔑 分析したいキーワードを入力（1行に1つ・最大20件）",
-            value=default_kw,
-            height=180,
+            value=default_kw, height=180,
             placeholder="格安スマホ 乗り換え おすすめ\niPhone 最新 購入\nスマホ 高級 おすすめ",
         )
     with col_btn:
         st.markdown("<br>"*3, unsafe_allow_html=True)
         run_button = st.button("🚀 分析開始", use_container_width=True, type="primary")
-        kw_list = [k.strip() for k in keywords_input.strip().splitlines() if k.strip()]
+        kw_list  = [k.strip() for k in keywords_input.strip().splitlines() if k.strip()]
         st.info(f"入力数：**{len(kw_list)}件**")
         memo     = st.text_input("📝 メモ（任意）", placeholder="例：競合調査 2024年6月")
-        industry = st.text_input(
-            "🏢 業種・ジャンル（任意）",
-            placeholder="例：スマートフォン / 不動産 / コスメ",
-        )
+        industry = st.text_input("🏢 業種・ジャンル（任意）", placeholder="例：スマートフォン / 不動産")
  
     if run_button:
         if not api_key:
-            st.error("⚠️ サイドバーにAPIキーを入力してください。"); st.stop()
-        if not kw_list:
-            st.warning("⚠️ キーワードを1つ以上入力してください。"); st.stop()
-        if len(kw_list) > 20:
-            st.warning("⚠️ 最初の20件を分析します。")
-            kw_list = kw_list[:20]
- 
-        client   = get_client(api_key)
-        results  = []
-        progress = st.progress(0)
-        status   = st.empty()
- 
-        for i, kw in enumerate(kw_list):
-            status.markdown(f"⏳ 分析中... **{kw}** ({i+1}/{len(kw_list)})")
-            progress.progress((i+1)/len(kw_list))
-            try:
-                data = analyze_keyword_structured(client, kw, industry=industry)
-                results.append(data)
-            except Exception as e:
-                results.append({"keyword":kw,"error":str(e)})
-            time.sleep(0.5)
- 
-        progress.empty()
-        session_id = save_session(results, memo=memo)
-        status.success(f"✅ {len(kw_list)}件の分析完了！DBに保存しました（セッションID: {session_id}）")
-        st.session_state["results"] = results
+            st.error("⚠️ サイドバーにAPIキーを入力してください。")
+        elif not kw_list:
+            st.warning("⚠️ キーワードを1つ以上入力してください。")
+        else:
+            if len(kw_list) > 20:
+                st.warning("⚠️ 最初の20件を分析します。")
+                kw_list = kw_list[:20]
+            client   = get_client(api_key)
+            results  = []
+            progress = st.progress(0)
+            status   = st.empty()
+            for i, kw in enumerate(kw_list):
+                status.markdown(f"⏳ 分析中... **{kw}** ({i+1}/{len(kw_list)})")
+                progress.progress((i+1)/len(kw_list))
+                try:
+                    data = analyze_keyword_structured(client, kw, industry=industry)
+                    results.append(data)
+                except Exception as e:
+                    results.append({"keyword":kw,"error":str(e)})
+                time.sleep(0.5)
+            progress.empty()
+            session_id = save_session(results, memo=memo)
+            status.success(f"✅ {len(kw_list)}件の分析完了！（セッションID: {session_id}）")
+            st.session_state["results"] = results
  
  
 # =====================================
@@ -491,95 +453,93 @@ with tab_analyze:
 # =====================================
 with tab_result:
     if "results" not in st.session_state:
-        st.info("👈 「🔍 キーワード分析」タブで分析してください。"); st.stop()
+        show_empty_state("📝", "まだ分析結果がありません",
+            "「🔍 キーワード分析」タブでキーワードを入力して分析してください。")
+    else:
+        results = st.session_state["results"]
+        valid   = [r for r in results if "error" not in r]
+        if not valid:
+            st.error("有効な分析結果がありません。")
+        else:
+            st.markdown('<p class="section-title">📊 分析サマリー</p>', unsafe_allow_html=True)
+            seg_counts = {s:0 for s in SEGMENT_INFO}
+            for r in valid:
+                seg = r.get("price_segment","")
+                if seg in seg_counts: seg_counts[seg]+=1
+            avg_score = sum(r.get("purchase_score",0) for r in valid)/len(valid)
  
-    results = st.session_state["results"]
-    valid   = [r for r in results if "error" not in r]
-    if not valid:
-        st.error("有効な分析結果がありません。"); st.stop()
+            c1,c2,c3,c4,c5,c6 = st.columns(6)
+            c1.metric("分析件数",     f"{len(valid)}件")
+            c2.metric("平均購買意欲", f"{avg_score:.1f}/10")
+            c3.metric("💚 Budget",   f"{seg_counts['Budget']}件")
+            c4.metric("💙 Standard", f"{seg_counts['Standard']}件")
+            c5.metric("💜 Premium",  f"{seg_counts['Premium']}件")
+            c6.metric("🖤 Luxury",   f"{seg_counts['Luxury']}件")
+            st.markdown("---")
  
-    st.markdown('<p class="section-title">📊 分析サマリー</p>', unsafe_allow_html=True)
-    seg_counts = {s:0 for s in SEGMENT_INFO}
-    for r in valid:
-        seg = r.get("price_segment","")
-        if seg in seg_counts: seg_counts[seg]+=1
-    avg_score = sum(r.get("purchase_score",0) for r in valid)/len(valid)
+            f1,f2,f3 = st.columns(3)
+            with f1:
+                seg_filter = st.multiselect("価格帯", list(SEGMENT_INFO.keys()), default=list(SEGMENT_INFO.keys()))
+            with f2:
+                intent_opts = sorted(set(r.get("search_intent","") for r in valid if r.get("search_intent")))
+                intent_filter = st.multiselect("検索意図", intent_opts, default=intent_opts)
+            with f3:
+                score_min = st.slider("購買意欲スコア（最小）", 1, 10, 1)
  
-    c1,c2,c3,c4,c5,c6 = st.columns(6)
-    c1.metric("分析件数",     f"{len(valid)}件")
-    c2.metric("平均購買意欲", f"{avg_score:.1f}/10")
-    c3.metric("💚 Budget",   f"{seg_counts['Budget']}件")
-    c4.metric("💙 Standard", f"{seg_counts['Standard']}件")
-    c5.metric("💜 Premium",  f"{seg_counts['Premium']}件")
-    c6.metric("🖤 Luxury",   f"{seg_counts['Luxury']}件")
-    st.markdown("---")
+            filtered = [
+                r for r in valid
+                if r.get("price_segment") in seg_filter
+                and r.get("search_intent") in intent_filter
+                and r.get("purchase_score",0) >= score_min
+            ]
+            st.caption(f"表示中：{len(filtered)}件 / {len(valid)}件")
+            st.markdown("---")
  
-    f1,f2,f3 = st.columns(3)
-    with f1:
-        seg_filter = st.multiselect("価格帯",list(SEGMENT_INFO.keys()),default=list(SEGMENT_INFO.keys()))
-    with f2:
-        intent_opts = sorted(set(r.get("search_intent","") for r in valid if r.get("search_intent")))
-        intent_filter = st.multiselect("検索意図",intent_opts,default=intent_opts)
-    with f3:
-        score_min = st.slider("購買意欲スコア（最小）",1,10,1)
+            st.markdown('<p class="section-title">📝 キーワード別 詳細分析</p>', unsafe_allow_html=True)
+            render_keyword_cards(filtered)
  
-    filtered = [
-        r for r in valid
-        if r.get("price_segment") in seg_filter
-        and r.get("search_intent") in intent_filter
-        and r.get("purchase_score",0) >= score_min
-    ]
-    st.caption(f"表示中：{len(filtered)}件 / {len(valid)}件")
-    st.markdown("---")
+            st.markdown("---")
+            st.markdown('<p class="section-title">📋 一覧比較表</p>', unsafe_allow_html=True)
+            rows = []
+            for r in filtered:
+                ad1 = r.get("ad_copies",[{}])[0]
+                rows.append({
+                    "キーワード":      r.get("keyword",""),
+                    "検索意図":        r.get("search_intent",""),
+                    "価格帯層":        r.get("price_segment",""),
+                    "購買意欲(1-10)": r.get("purchase_score",""),
+                    "広告タイトル案1": ad1.get("title",""),
+                    "広告説明文案1":   ad1.get("description",""),
+                    "アドバイス":      r.get("advice",""),
+                })
+            df = pd.DataFrame(rows)
+            st.dataframe(df, use_container_width=True, hide_index=True)
  
-    st.markdown('<p class="section-title">📝 キーワード別 詳細分析</p>', unsafe_allow_html=True)
-    render_keyword_cards(filtered)
+            st.markdown("---")
+            st.markdown('<p class="section-title">💾 データ保存</p>', unsafe_allow_html=True)
+            now        = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            csv_data   = df.to_csv(index=False,encoding="utf-8-sig").encode("utf-8-sig")
+            json_data  = json.dumps(results,ensure_ascii=False,indent=2).encode("utf-8")
+            html_report = generate_html_report(results=filtered, title="AIキーワード分析レポート",
+                memo=f"分析件数: {len(filtered)}件")
+            html_data  = html_report.encode("utf-8")
  
-    st.markdown("---")
-    st.markdown('<p class="section-title">📋 一覧比較表</p>', unsafe_allow_html=True)
-    rows = []
-    for r in filtered:
-        ad1 = r.get("ad_copies",[{}])[0]
-        rows.append({
-            "キーワード":      r.get("keyword",""),
-            "検索意図":        r.get("search_intent",""),
-            "価格帯層":        r.get("price_segment",""),
-            "購買意欲(1-10)": r.get("purchase_score",""),
-            "広告タイトル案1": ad1.get("title",""),
-            "広告説明文案1":   ad1.get("description",""),
-            "アドバイス":      r.get("advice",""),
-        })
-    df = pd.DataFrame(rows)
-    st.dataframe(df, use_container_width=True, hide_index=True)
+            dl1,dl2,dl3 = st.columns(3)
+            with dl1:
+                st.download_button("📥 CSVでダウンロード", data=csv_data,
+                    file_name=f"keyword_analysis_{now}.csv", mime="text/csv", use_container_width=True)
+            with dl2:
+                st.download_button("📥 JSONでダウンロード", data=json_data,
+                    file_name=f"keyword_analysis_{now}.json", mime="application/json", use_container_width=True)
+            with dl3:
+                st.download_button("📄 HTMLレポートをダウンロード", data=html_data,
+                    file_name=f"report_{now}.html", mime="text/html", use_container_width=True)
  
-    st.markdown("---")
-    st.markdown('<p class="section-title">💾 データ保存</p>', unsafe_allow_html=True)
-    now       = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    csv_data  = df.to_csv(index=False,encoding="utf-8-sig").encode("utf-8-sig")
-    json_data = json.dumps(results,ensure_ascii=False,indent=2).encode("utf-8")
-    html_report = generate_html_report(
-        results=filtered,
-        title="AIキーワード分析レポート",
-        memo=f"分析件数: {len(filtered)}件",
-    )
-    html_data = html_report.encode("utf-8")
- 
-    dl1,dl2,dl3 = st.columns(3)
-    with dl1:
-        st.download_button("📥 CSVでダウンロード",data=csv_data,
-            file_name=f"keyword_analysis_{now}.csv",mime="text/csv",use_container_width=True)
-    with dl2:
-        st.download_button("📥 JSONでダウンロード",data=json_data,
-            file_name=f"keyword_analysis_{now}.json",mime="application/json",use_container_width=True)
-    with dl3:
-        st.download_button("📄 HTMLレポートをダウンロード",data=html_data,
-            file_name=f"report_{now}.html",mime="text/html",use_container_width=True)
- 
-    st.markdown("---")
-    st.markdown('<p class="section-title">👁️ レポートプレビュー</p>', unsafe_allow_html=True)
-    st.caption("ダウンロードしたHTMLをブラウザで開いて Ctrl+P → 「PDFとして保存」でPDF化できます。")
-    with st.expander("レポートのプレビューを表示", expanded=False):
-        st.components.v1.html(html_report, height=600, scrolling=True)
+            st.markdown("---")
+            st.markdown('<p class="section-title">👁️ レポートプレビュー</p>', unsafe_allow_html=True)
+            st.caption("ダウンロードしたHTMLをブラウザで開いて Ctrl+P → 「PDFとして保存」でPDF化できます。")
+            with st.expander("レポートのプレビューを表示", expanded=False):
+                st.components.v1.html(html_report, height=600, scrolling=True)
  
  
 # =====================================
@@ -587,27 +547,28 @@ with tab_result:
 # =====================================
 with tab_chart:
     if "results" not in st.session_state:
-        st.info("👈 「🔍 キーワード分析」タブで分析してください。"); st.stop()
+        show_empty_state("📊", "まだ分析結果がありません",
+            "「🔍 キーワード分析」タブでキーワードを入力して分析してください。")
+    else:
+        results = st.session_state["results"]
+        valid   = [r for r in results if "error" not in r]
+        if not valid:
+            st.error("有効な分析結果がありません。")
+        else:
+            seg_counts = {s:0 for s in SEGMENT_INFO}
+            for r in valid:
+                seg = r.get("price_segment","")
+                if seg in seg_counts: seg_counts[seg]+=1
  
-    results = st.session_state["results"]
-    valid   = [r for r in results if "error" not in r]
-    if not valid:
-        st.error("有効な分析結果がありません。"); st.stop()
- 
-    seg_counts = {s:0 for s in SEGMENT_INFO}
-    for r in valid:
-        seg = r.get("price_segment","")
-        if seg in seg_counts: seg_counts[seg]+=1
- 
-    st.markdown('<p class="section-title">📊 グラフ分析</p>', unsafe_allow_html=True)
-    st.plotly_chart(make_score_bar_chart(valid), use_container_width=True)
-    st.markdown("---")
-    g1,g2 = st.columns(2)
-    with g1: st.plotly_chart(make_segment_pie_chart(seg_counts), use_container_width=True)
-    with g2: st.plotly_chart(make_intent_bar_chart(valid), use_container_width=True)
-    st.markdown("---")
-    st.markdown('<p class="section-title">💡 グラフの読み方</p>', unsafe_allow_html=True)
-    st.markdown("""
+            st.markdown('<p class="section-title">📊 グラフ分析</p>', unsafe_allow_html=True)
+            st.plotly_chart(make_score_bar_chart(valid), use_container_width=True)
+            st.markdown("---")
+            g1,g2 = st.columns(2)
+            with g1: st.plotly_chart(make_segment_pie_chart(seg_counts), use_container_width=True)
+            with g2: st.plotly_chart(make_intent_bar_chart(valid), use_container_width=True)
+            st.markdown("---")
+            st.markdown('<p class="section-title">💡 グラフの読み方</p>', unsafe_allow_html=True)
+            st.markdown("""
 | グラフ | 見るべきポイント |
 |--------|----------------|
 | 📈 購買意欲スコア | 8点以上は入札単価を上げる価値あり |
@@ -623,233 +584,159 @@ with tab_csv:
     st.markdown('<p class="section-title">📂 CSVアップロード＆AI分析</p>', unsafe_allow_html=True)
     st.caption("Google Ads・SEOツール・Excelなど、どんな形式のCSVでも自動で読み込んでAIが分析します。")
  
-    uploaded = st.file_uploader(
-        "CSVファイルをアップロード",
-        type=["csv"],
-        help="文字コードはUTF-8またはShift-JIS（Excel保存のCSV）に対応しています。",
-    )
+    uploaded = st.file_uploader("CSVファイルをアップロード", type=["csv"],
+        help="UTF-8またはShift-JIS（Excel保存のCSV）に対応しています。")
  
     if uploaded is None:
-        st.markdown("""
-<div style="background:#f8fafc;border:2px dashed #c7d2fe;border-radius:16px;
-padding:40px;text-align:center;color:#6366f1;">
-  <div style="font-size:40px;margin-bottom:12px;">📂</div>
-  <div style="font-size:16px;font-weight:700;margin-bottom:8px;">CSVファイルをアップロードしてください</div>
-  <div style="font-size:13px;color:#64748b;">
-    Google Ads・SEOツール・Excelなど形式を問わず分析できます<br>
-    キーワード・クリック数・CTR・CPC・CVR・CPA などを自動で認識します
-  </div>
-</div>
-""", unsafe_allow_html=True)
-        st.stop()
- 
-    # CSV読み込み（UTF-8 / Shift-JIS 両対応）
-    try:
+        show_empty_state("📂", "CSVファイルをアップロードしてください",
+            "Google Ads・SEOツール・Excelなど形式を問わず分析できます。\nキーワード・CTR・CPC・CVR・CPAなどを自動で認識します。")
+    else:
         try:
-            df_raw = pd.read_csv(uploaded, encoding="utf-8")
-        except UnicodeDecodeError:
-            uploaded.seek(0)
-            df_raw = pd.read_csv(uploaded, encoding="shift-jis")
-    except Exception as e:
-        st.error(f"CSVの読み込みに失敗しました: {e}"); st.stop()
+            try:
+                df_raw = pd.read_csv(uploaded, encoding="utf-8")
+            except UnicodeDecodeError:
+                uploaded.seek(0)
+                df_raw = pd.read_csv(uploaded, encoding="shift-jis")
  
-    col_map = detect_columns(df_raw)
-    df_prep = prepare_dataframe(df_raw, col_map)
+            col_map = detect_columns(df_raw)
+            df_prep = prepare_dataframe(df_raw, col_map)
  
-    # データプレビュー
-    st.markdown('<p class="section-title">📋 読み込んだデータ</p>', unsafe_allow_html=True)
-    m1,m2,m3 = st.columns(3)
-    m1.metric("総行数",   f"{len(df_raw)}行")
-    m2.metric("総列数",   f"{len(df_raw.columns)}列")
-    m3.metric("検出指標", f"{len(col_map)}項目")
+            st.markdown('<p class="section-title">📋 読み込んだデータ</p>', unsafe_allow_html=True)
+            m1,m2,m3 = st.columns(3)
+            m1.metric("総行数",   f"{len(df_raw)}行")
+            m2.metric("総列数",   f"{len(df_raw.columns)}列")
+            m3.metric("検出指標", f"{len(col_map)}項目")
  
-    st.markdown("**検出された列**")
-    if col_map:
-        chip_html = "".join(
-            f'<span class="meta-chip">✅ {k} → {v}</span>'
-            for k,v in col_map.items()
-        )
-        st.markdown(
-            f'<div style="display:flex;flex-wrap:wrap;gap:6px;margin:8px 0;">{chip_html}</div>',
-            unsafe_allow_html=True,
-        )
-    else:
-        st.warning("標準的なマーケティング指標の列が検出できませんでした。列名を確認してください。")
- 
-    with st.expander("データプレビュー（先頭10行）", expanded=False):
-        st.dataframe(df_raw.head(10), use_container_width=True, hide_index=True)
- 
-    st.markdown("---")
- 
-    # グラフ自動生成
-    st.markdown('<p class="section-title">📊 データの可視化</p>', unsafe_allow_html=True)
-    chart_pairs = [
-        ("ctr",   "CTR上位キーワード",        "#6366f1"),
-        ("clicks","クリック数ランキング",      "#3b82f6"),
-        ("cpc",   "CPC比較",                  "#f59e0b"),
-        ("cvr",   "CVR比較",                  "#10b981"),
-        ("cpa",   "CPA比較（低いほど優秀）",   "#ef4444"),
-    ]
-    shown = 0
-    gc1 = gc2 = None
-    for metric, title, color in chart_pairs:
-        if metric in col_map and "keyword" in col_map:
-            top_df, _ = get_top_bottom_keywords(df_prep, col_map, metric=metric, top_n=10)
-            if not top_df.empty:
-                kw_col  = col_map["keyword"]
-                met_col = col_map[metric]
-                if shown % 2 == 0:
-                    gc1, gc2 = st.columns(2)
-                col = gc1 if shown % 2 == 0 else gc2
-                with col:
-                    st.plotly_chart(
-                        make_csv_bar_chart(top_df, kw_col, met_col, f"📊 {title}", color),
-                        use_container_width=True,
-                    )
-                shown += 1
- 
-    if shown == 0:
-        st.info("グラフを表示するにはキーワード列と数値列（CTR・クリック数など）が必要です。")
- 
-    st.markdown("---")
- 
-    # AI分析
-    st.markdown('<p class="section-title">🤖 AIによるトレンド・改善点の自動抽出</p>', unsafe_allow_html=True)
-    csv_industry = st.text_input("🏢 業種・ジャンル（任意）",
-        placeholder="例：ECサイト / 不動産 / SaaS", key="csv_industry")
-    csv_question = st.text_input("💬 特に知りたいこと（任意）",
-        placeholder="例：CVRが低いキーワードの原因を知りたい", key="csv_question")
- 
-    if not api_key:
-        st.warning("⚠️ サイドバーにAPIキーを入力すると、AIによる分析ができます。")
-    else:
-        if st.button("🤖 AIで分析する", type="primary"):
-            with st.spinner("AIがCSVを分析中です..."):
-                try:
-                    client    = get_client(api_key)
-                    ai_result = analyze_csv_with_ai(
-                        client, df_prep, col_map,
-                        industry=csv_industry,
-                        custom_question=csv_question,
-                    )
-                    st.session_state["csv_ai_result"] = ai_result
-                except Exception as e:
-                    st.error(f"AI分析中にエラーが発生しました: {e}")
- 
-    # AI分析結果の表示
-    if "csv_ai_result" in st.session_state:
-        ai = st.session_state["csv_ai_result"]
- 
-        if ai.get("summary"):
-            st.markdown(
-                f'<div class="advice-box" style="margin-top:8px;">📋 総評：{ai["summary"]}</div>',
-                unsafe_allow_html=True,
-            )
- 
-        st.markdown("---")
-        r1,r2 = st.columns(2)
- 
-        with r1:
-            st.markdown(
-                '<div class="insight-card"><div class="insight-card-title">📈 トレンド・傾向</div>',
-                unsafe_allow_html=True,
-            )
-            for item in ai.get("trends",[]):
-                st.markdown(
-                    f'<div class="insight-item"><span class="insight-icon">📌</span>{item}</div>',
-                    unsafe_allow_html=True,
+            st.markdown("**検出された列**")
+            if col_map:
+                chip_html = "".join(
+                    f'<span class="meta-chip">✅ {k} → {v}</span>'
+                    for k,v in col_map.items()
                 )
-            st.markdown('</div>', unsafe_allow_html=True)
+                st.markdown(f'<div style="display:flex;flex-wrap:wrap;gap:6px;margin:8px 0;">{chip_html}</div>',
+                    unsafe_allow_html=True)
+            else:
+                st.warning("標準的なマーケティング指標の列が検出できませんでした。列名を確認してください。")
  
-        with r2:
-            st.markdown(
-                '<div class="insight-card"><div class="insight-card-title">⚠️ 課題・問題点</div>',
-                unsafe_allow_html=True,
-            )
-            for item in ai.get("issues",[]):
-                st.markdown(
-                    f'<div class="insight-item"><span class="insight-icon">🔴</span>{item}</div>',
-                    unsafe_allow_html=True,
-                )
-            st.markdown('</div>', unsafe_allow_html=True)
+            with st.expander("データプレビュー（先頭10行）", expanded=False):
+                st.dataframe(df_raw.head(10), use_container_width=True, hide_index=True)
  
-        st.markdown(
-            '<div class="insight-card"><div class="insight-card-title">💡 改善提案</div>',
-            unsafe_allow_html=True,
-        )
-        for item in ai.get("improvements",[]):
-            st.markdown(
-                f'<div class="insight-item"><span class="insight-icon">✅</span>{item}</div>',
-                unsafe_allow_html=True,
-            )
-        st.markdown('</div>', unsafe_allow_html=True)
- 
-        r3,r4 = st.columns(2)
-        with r3:
-            st.markdown(
-                '<div class="insight-card"><div class="insight-card-title">🎯 ターゲティング最適化</div>',
-                unsafe_allow_html=True,
-            )
-            for item in ai.get("targeting",[]):
-                st.markdown(
-                    f'<div class="insight-item"><span class="insight-icon">🎯</span>{item}</div>',
-                    unsafe_allow_html=True,
-                )
-            st.markdown('</div>', unsafe_allow_html=True)
- 
-        with r4:
-            medals = ["🥇","🥈","🥉"]
-            st.markdown(
-                '<div class="insight-card"><div class="insight-card-title">🚀 今すぐやるべきアクション</div>',
-                unsafe_allow_html=True,
-            )
-            for i, item in enumerate(ai.get("next_actions",[])):
-                icon = medals[i] if i < 3 else "▶️"
-                st.markdown(
-                    f'<div class="insight-item"><span class="insight-icon">{icon}</span>{item}</div>',
-                    unsafe_allow_html=True,
-                )
-            st.markdown('</div>', unsafe_allow_html=True)
- 
-        # 注目キーワード
-        if ai.get("top_keywords"):
-            st.markdown('<p class="section-title">⭐ 注目キーワード</p>', unsafe_allow_html=True)
-            kw_cols = st.columns(min(len(ai["top_keywords"]),3))
-            for i,kw in enumerate(ai["top_keywords"]):
-                with kw_cols[i % 3]:
-                    st.markdown(
-                        f'<div class="top-kw-card">'
-                        f'<div class="top-kw-name">🔍 {kw.get("keyword","")}</div>'
-                        f'<div class="top-kw-reason">{kw.get("reason","")}</div>'
-                        f'<div class="top-kw-action">→ {kw.get("action","")}</div>'
-                        f'</div>',
-                        unsafe_allow_html=True,
-                    )
- 
-        # キーワード分析タブへ連携
-        if "keyword" in col_map:
             st.markdown("---")
-            st.markdown('<p class="section-title">🔗 キーワード分析へ連携</p>', unsafe_allow_html=True)
-            st.caption("CSVのキーワードをそのまま広告文生成タブに送れます。")
-            kw_list_csv = df_raw[col_map["keyword"]].dropna().astype(str).str.strip().unique().tolist()
-            selected_kws = st.multiselect(
-                "分析するキーワードを選択（最大20件）",
-                options=kw_list_csv[:50],
-                default=kw_list_csv[:5],
-            )
-            if st.button("📤 選択したキーワードを分析タブへ送る"):
-                st.session_state["csv_keywords"] = "\n".join(selected_kws[:20])
-                st.success("✅ 「🔍 キーワード分析」タブを開いてキーワード欄を確認してください。")
+            st.markdown('<p class="section-title">📊 データの可視化</p>', unsafe_allow_html=True)
+            chart_pairs = [
+                ("ctr",   "CTR上位キーワード",       "#6366f1"),
+                ("clicks","クリック数ランキング",     "#3b82f6"),
+                ("cpc",   "CPC比較",                 "#f59e0b"),
+                ("cvr",   "CVR比較",                 "#10b981"),
+                ("cpa",   "CPA比較（低いほど優秀）",  "#ef4444"),
+            ]
+            shown = 0
+            gc1 = gc2 = None
+            for metric, title, color in chart_pairs:
+                if metric in col_map and "keyword" in col_map:
+                    top_df, _ = get_top_bottom_keywords(df_prep, col_map, metric=metric, top_n=10)
+                    if not top_df.empty:
+                        if shown % 2 == 0:
+                            gc1, gc2 = st.columns(2)
+                        col = gc1 if shown % 2 == 0 else gc2
+                        with col:
+                            st.plotly_chart(
+                                make_csv_bar_chart(top_df, col_map["keyword"], col_map[metric], f"📊 {title}", color),
+                                use_container_width=True,
+                            )
+                        shown += 1
+            if shown == 0:
+                st.info("グラフを表示するにはキーワード列と数値列（CTR・クリック数など）が必要です。")
  
-        # ダウンロード
-        st.markdown("---")
-        ai_json = json.dumps(ai,ensure_ascii=False,indent=2).encode("utf-8")
-        st.download_button(
-            "📥 AI分析結果をJSONでダウンロード",
-            data=ai_json,
-            file_name=f"csv_analysis_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
-            mime="application/json",
-        )
+            st.markdown("---")
+            st.markdown('<p class="section-title">🤖 AIによるトレンド・改善点の自動抽出</p>', unsafe_allow_html=True)
+            csv_industry = st.text_input("🏢 業種・ジャンル（任意）",
+                placeholder="例：ECサイト / 不動産 / SaaS", key="csv_industry")
+            csv_question = st.text_input("💬 特に知りたいこと（任意）",
+                placeholder="例：CVRが低いキーワードの原因を知りたい", key="csv_question")
+ 
+            if not api_key:
+                st.warning("⚠️ サイドバーにAPIキーを入力すると、AIによる分析ができます。")
+            else:
+                if st.button("🤖 AIで分析する", type="primary"):
+                    with st.spinner("AIがCSVを分析中です..."):
+                        try:
+                            client    = get_client(api_key)
+                            ai_result = analyze_csv_with_ai(client, df_prep, col_map,
+                                industry=csv_industry, custom_question=csv_question)
+                            st.session_state["csv_ai_result"] = ai_result
+                        except Exception as e:
+                            st.error(f"AI分析中にエラーが発生しました: {e}")
+ 
+            if "csv_ai_result" in st.session_state:
+                ai = st.session_state["csv_ai_result"]
+                if ai.get("summary"):
+                    st.markdown(f'<div class="advice-box" style="margin-top:8px;">📋 総評：{ai["summary"]}</div>',
+                        unsafe_allow_html=True)
+                st.markdown("---")
+ 
+                r1,r2 = st.columns(2)
+                with r1:
+                    st.markdown('<div class="insight-card"><div class="insight-card-title">📈 トレンド・傾向</div>', unsafe_allow_html=True)
+                    for item in ai.get("trends",[]):
+                        st.markdown(f'<div class="insight-item"><span class="insight-icon">📌</span>{item}</div>', unsafe_allow_html=True)
+                    st.markdown('</div>', unsafe_allow_html=True)
+                with r2:
+                    st.markdown('<div class="insight-card"><div class="insight-card-title">⚠️ 課題・問題点</div>', unsafe_allow_html=True)
+                    for item in ai.get("issues",[]):
+                        st.markdown(f'<div class="insight-item"><span class="insight-icon">🔴</span>{item}</div>', unsafe_allow_html=True)
+                    st.markdown('</div>', unsafe_allow_html=True)
+ 
+                st.markdown('<div class="insight-card"><div class="insight-card-title">💡 改善提案</div>', unsafe_allow_html=True)
+                for item in ai.get("improvements",[]):
+                    st.markdown(f'<div class="insight-item"><span class="insight-icon">✅</span>{item}</div>', unsafe_allow_html=True)
+                st.markdown('</div>', unsafe_allow_html=True)
+ 
+                r3,r4 = st.columns(2)
+                medals = ["🥇","🥈","🥉"]
+                with r3:
+                    st.markdown('<div class="insight-card"><div class="insight-card-title">🎯 ターゲティング最適化</div>', unsafe_allow_html=True)
+                    for item in ai.get("targeting",[]):
+                        st.markdown(f'<div class="insight-item"><span class="insight-icon">🎯</span>{item}</div>', unsafe_allow_html=True)
+                    st.markdown('</div>', unsafe_allow_html=True)
+                with r4:
+                    st.markdown('<div class="insight-card"><div class="insight-card-title">🚀 今すぐやるべきアクション</div>', unsafe_allow_html=True)
+                    for i, item in enumerate(ai.get("next_actions",[])):
+                        icon = medals[i] if i < 3 else "▶️"
+                        st.markdown(f'<div class="insight-item"><span class="insight-icon">{icon}</span>{item}</div>', unsafe_allow_html=True)
+                    st.markdown('</div>', unsafe_allow_html=True)
+ 
+                if ai.get("top_keywords"):
+                    st.markdown('<p class="section-title">⭐ 注目キーワード</p>', unsafe_allow_html=True)
+                    kw_cols = st.columns(min(len(ai["top_keywords"]),3))
+                    for i,kw in enumerate(ai["top_keywords"]):
+                        with kw_cols[i%3]:
+                            st.markdown(
+                                f'<div class="top-kw-card">'
+                                f'<div class="top-kw-name">🔍 {kw.get("keyword","")}</div>'
+                                f'<div class="top-kw-reason">{kw.get("reason","")}</div>'
+                                f'<div class="top-kw-action">→ {kw.get("action","")}</div>'
+                                f'</div>', unsafe_allow_html=True)
+ 
+                if "keyword" in col_map:
+                    st.markdown("---")
+                    st.markdown('<p class="section-title">🔗 キーワード分析へ連携</p>', unsafe_allow_html=True)
+                    kw_list_csv = df_raw[col_map["keyword"]].dropna().astype(str).str.strip().unique().tolist()
+                    selected_kws = st.multiselect("分析するキーワードを選択（最大20件）",
+                        options=kw_list_csv[:50], default=kw_list_csv[:5])
+                    if st.button("📤 選択したキーワードを分析タブへ送る"):
+                        st.session_state["csv_keywords"] = "\n".join(selected_kws[:20])
+                        st.success("✅ 「🔍 キーワード分析」タブを開いてキーワード欄を確認してください。")
+ 
+                st.markdown("---")
+                ai_json = json.dumps(ai,ensure_ascii=False,indent=2).encode("utf-8")
+                st.download_button("📥 AI分析結果をJSONでダウンロード", data=ai_json,
+                    file_name=f"csv_analysis_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+                    mime="application/json")
+ 
+        except Exception as e:
+            st.error(f"CSVの読み込みに失敗しました: {e}")
+            st.info("ファイルの文字コードがUTF-8またはShift-JISであることを確認してください。")
  
  
 # =====================================
@@ -857,76 +744,69 @@ padding:40px;text-align:center;color:#6366f1;">
 # =====================================
 with tab_history:
     st.markdown('<p class="section-title">🗄️ 分析履歴</p>', unsafe_allow_html=True)
- 
     sessions = get_all_sessions()
+ 
     if not sessions:
-        st.info("まだ分析履歴がありません。「🔍 キーワード分析」タブで分析してください。")
-        st.stop()
- 
-    st.markdown(f"**保存済みセッション数：{len(sessions)}件**")
-    st.markdown("---")
- 
-    for s in sessions:
-        col_info,col_btn1,col_btn2 = st.columns([4,1,1])
-        with col_info:
-            memo_text = f"　📝 {s['memo']}" if s.get("memo") else ""
-            st.markdown(
-                f'<div class="history-card">'
-                f'<div><div class="history-date">🕐 {s["created_at"]}{memo_text}</div></div>'
-                f'<div class="history-count">📊 {s["kw_count"]}件のキーワード</div>'
-                f'</div>',
-                unsafe_allow_html=True,
-            )
-        with col_btn1:
-            st.markdown("<br>", unsafe_allow_html=True)
-            if st.button("📂 表示",key=f"show_{s['id']}",use_container_width=True):
-                loaded = get_session_results(s["id"])
-                st.session_state["results"] = loaded
-                st.success(f"セッション {s['id']} を読み込みました。「📝 分析結果」タブを確認してください。")
-        with col_btn2:
-            st.markdown("<br>", unsafe_allow_html=True)
-            if st.button("🗑️ 削除",key=f"del_{s['id']}",use_container_width=True):
-                delete_session(s["id"])
-                st.warning(f"セッション {s['id']} を削除しました。")
-                st.rerun()
- 
-    st.markdown("---")
-    st.markdown('<p class="section-title">📈 キーワード別 推移を確認</p>', unsafe_allow_html=True)
- 
-    all_kws = get_all_keywords()
-    if all_kws:
-        selected_kw = st.selectbox(
-            "推移を見たいキーワードを選択",
-            options=all_kws,
-            help="複数回分析されたキーワードの購買意欲スコアの推移を表示します",
-        )
-        if selected_kw:
-            history = get_keyword_history(selected_kw)
-            if len(history) >= 2:
-                st.plotly_chart(make_history_line_chart(history,selected_kw),use_container_width=True)
-                diff = history[-1]["purchase_score"] - history[0]["purchase_score"]
-                if diff > 0:   st.success(f"📈 初回分析から **+{diff}点** 上昇しています。")
-                elif diff < 0: st.warning(f"📉 初回分析から **{diff}点** 下降しています。")
-                else:          st.info("➡️ スコアに変化はありません。")
-            else:
-                st.info(f"「{selected_kw}」はまだ1回しか分析されていません。")
+        show_empty_state("🗄️", "まだ分析履歴がありません",
+            "「🔍 キーワード分析」タブで分析すると、結果が自動的に保存されます。")
     else:
-        st.info("保存済みのキーワードがありません。")
+        st.markdown(f"**保存済みセッション数：{len(sessions)}件**")
+        st.markdown("---")
  
-    st.markdown("---")
-    st.markdown('<p class="section-title">📊 全履歴サマリー</p>', unsafe_allow_html=True)
-    stats = get_segment_stats()
-    if stats:
-        stat_rows = []
-        for seg,data in stats.items():
-            info = SEGMENT_INFO.get(seg,{})
-            stat_rows.append({
-                "価格帯層":     f"{info.get('emoji','')} {seg}",
-                "分析件数":     f"{data['count']}件",
-                "平均購買意欲": f"{data['avg_score']:.1f}/10",
-                "推奨戦略":     info.get("strategy",""),
-            })
-        st.dataframe(pd.DataFrame(stat_rows),use_container_width=True,hide_index=True)
+        for s in sessions:
+            col_info,col_btn1,col_btn2 = st.columns([4,1,1])
+            with col_info:
+                memo_text = f"　📝 {s['memo']}" if s.get("memo") else ""
+                st.markdown(
+                    f'<div class="history-card">'
+                    f'<div><div class="history-date">🕐 {s["created_at"]}{memo_text}</div></div>'
+                    f'<div class="history-count">📊 {s["kw_count"]}件のキーワード</div>'
+                    f'</div>', unsafe_allow_html=True)
+            with col_btn1:
+                st.markdown("<br>", unsafe_allow_html=True)
+                if st.button("📂 表示", key=f"show_{s['id']}", use_container_width=True):
+                    loaded = get_session_results(s["id"])
+                    st.session_state["results"] = loaded
+                    st.success(f"セッション {s['id']} を読み込みました。「📝 分析結果」タブを確認してください。")
+            with col_btn2:
+                st.markdown("<br>", unsafe_allow_html=True)
+                if st.button("🗑️ 削除", key=f"del_{s['id']}", use_container_width=True):
+                    delete_session(s["id"])
+                    st.warning(f"セッション {s['id']} を削除しました。")
+                    st.rerun()
+ 
+        st.markdown("---")
+        st.markdown('<p class="section-title">📈 キーワード別 推移を確認</p>', unsafe_allow_html=True)
+        all_kws = get_all_keywords()
+        if all_kws:
+            selected_kw = st.selectbox("推移を見たいキーワードを選択", options=all_kws)
+            if selected_kw:
+                history = get_keyword_history(selected_kw)
+                if len(history) >= 2:
+                    st.plotly_chart(make_history_line_chart(history,selected_kw), use_container_width=True)
+                    diff = history[-1]["purchase_score"] - history[0]["purchase_score"]
+                    if diff > 0:   st.success(f"📈 初回分析から **+{diff}点** 上昇しています。")
+                    elif diff < 0: st.warning(f"📉 初回分析から **{diff}点** 下降しています。")
+                    else:          st.info("➡️ スコアに変化はありません。")
+                else:
+                    st.info(f"「{selected_kw}」はまだ1回しか分析されていません。")
+        else:
+            st.info("保存済みのキーワードがありません。")
+ 
+        st.markdown("---")
+        st.markdown('<p class="section-title">📊 全履歴サマリー</p>', unsafe_allow_html=True)
+        stats = get_segment_stats()
+        if stats:
+            stat_rows = []
+            for seg,data in stats.items():
+                info = SEGMENT_INFO.get(seg,{})
+                stat_rows.append({
+                    "価格帯層":     f"{info.get('emoji','')} {seg}",
+                    "分析件数":     f"{data['count']}件",
+                    "平均購買意欲": f"{data['avg_score']:.1f}/10",
+                    "推奨戦略":     info.get("strategy",""),
+                })
+            st.dataframe(pd.DataFrame(stat_rows), use_container_width=True, hide_index=True)
  
  
 # =====================================
@@ -940,7 +820,7 @@ with tab_guide:
  
 ---
  
-### 📂 CSV分析タブ（新機能）
+### 📂 CSV分析タブ
 CSVをアップロードするだけでAIが自動分析します。
  
 | できること | 説明 |
