@@ -886,6 +886,10 @@ with tab_trend:
 
         # ---- サマリーカード ----
         st.markdown('<p class="section-title">📊 キーワード別サマリー</p>', unsafe_allow_html=True)
+        # Google Trends取得時のエラーを表示
+        if market_data.get("error_trends"):
+            st.error(f"⚠️ トレンドデータ取得エラー: {market_data['error_trends']}")
+
         if summaries:
             cols = st.columns(len(summaries))
             trend_icons  = {"上昇":"📈","横ばい":"➡️","下降":"📉"}
