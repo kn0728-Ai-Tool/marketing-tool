@@ -1,5 +1,5 @@
-# app.py  v2.3
-# 修正：CSSへのコード混入を解消・AI強化版analyzer対応
+# app.py  v2.4
+# 追加機能：HTMLレポート生成・ダウンロード・プレビュー
  
 import streamlit as st
 import pandas as pd
@@ -8,6 +8,7 @@ import json
 import time
 import plotly.graph_objects as go
 import plotly.express as px
+from report import generate_html_report
 from analyzer import get_client, analyze_keyword_structured
 from database import (
     init_db, save_session,
@@ -605,13 +606,47 @@ with tab_result:
     now       = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     csv_data  = df.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
     json_data = json.dumps(results, ensure_ascii=False, indent=2).encode("utf-8")
-    dl1, dl2  = st.columns(2)
+ 
+    # HTMLレポートを生成
+    html_report = generate_html_report(
+        results=filtered,
+        title="AIキーワード分析レポート",
+        memo=f"分析件数: {len(filtered)}件",
+    )
+    html_data = html_report.encode("utf-8")
+ 
+    dl1, dl2, dl3 = st.columns(3)
     with dl1:
-        st.download_button("📥 CSVでダウンロード", data=csv_data,
-            file_name=f"keyword_analysis_{now}.csv", mime="text/csv", use_container_width=True)
+        st.download_button(
+            "📥 CSVでダウンロード",
+            data=csv_data,
+            file_name=f"keyword_analysis_{now}.csv",
+            mime="text/csv",
+            use_container_width=True,
+        )
     with dl2:
-        st.download_button("📥 JSONでダウンロード", data=json_data,
-            file_name=f"keyword_analysis_{now}.json", mime="application/json", use_container_width=True)
+        st.download_button(
+            "📥 JSONでダウンロード",
+            data=json_data,
+            file_name=f"keyword_analysis_{now}.json",
+            mime="application/json",
+            use_container_width=True,
+        )
+    with dl3:
+        st.download_button(
+            "📄 HTMLレポートをダウンロード",
+            data=html_data,
+            file_name=f"report_{now}.html",
+            mime="text/html",
+            use_container_width=True,
+        )
+ 
+    # レポートプレビュー
+    st.markdown("---")
+    st.markdown('<p class="section-title">👁️ レポートプレビュー</p>', unsafe_allow_html=True)
+    st.caption("ダウンロードしたHTMLファイルをブラウザで開いて Ctrl+P（Mac: Cmd+P）→「PDFとして保存」でPDF化できます。")
+    with st.expander("レポートのプレビューを表示", expanded=False):
+        st.components.v1.html(html_report, height=600, scrolling=True)
  
  
 # =====================================
