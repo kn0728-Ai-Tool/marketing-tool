@@ -220,3 +220,171 @@ def get_segment_stats() -> dict:
     rows = {row["price_segment"]: dict(row) for row in cur.fetchall()}
     conn.close()
     return rows
+    
+# =====================================
+# トレンド分析用テーブルの追加
+# =====================================
+
+def init_trend_db() -> None:
+    """
+    トレンド分析用のテーブルを初期化する。
+    アプリ起動時に init_db() と一緒に呼ぶ。
+    """
+    conn = get_connection()
+    cur  = conn.cursor()
+
+    # ジャンルごとのトレンドセッションテーブル
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS trend_sessions (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            created_at  TEXT    NOT NULL,
+            genre       TEXT    NOT NULL,
+            kw_count    INTEGER NOT NULL,
+            avg_score   REAL,
+            genre_trend TEXT,
+            ai_insight  TEXT
+        )
+    """)
+
+    # キーワードごとのトレンド結果テーブル
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS trend_keywords (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id      INTEGER NOT NULL,
+            created_at      TEXT    NOT NULL,
+            genre           TEXT    NOT NULL,
+            keyword         TEXT    NOT NULL,
+            purchase_score  INTEGER,
+            search_intent   TEXT,
+            price_segment   TEXT,
+            trend           TEXT,
+            trend_reason    TEXT,
+            FOREIGN KEY (session_id) REFERENCES trend_sessions(id)
+        )
+    """)
+
+    conn.commit()
+    conn.close()
+
+
+def save_trend_session(genre: str, result: dict) -> int:
+    """
+    トレンド分析結果をDBに保存する。
+    戻り値: 保存したセッションID
+    """
+    now  = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    conn = get_connection()
+    cur  = conn.cursor()
+
+    cur.execute("""
+        INSERT INTO trend_sessions
+            (created_at, genre, kw_count, avg_score, genre_trend, ai_insight)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (
+        now,
+        genre,
+        len(result.get("keywords", [])),
+        result.get("genre_avg_score", 0),
+        result.get("genre_trend", ""),
+        result.get("ai_insight", ""),
+    ))
+    session_id = cur.lastrowid
+
+    for kw in result.get("keywords", []):
+        cur.execute("""
+            INSERT INTO trend_keywords
+                (session_id, created_at, genre, keyword,
+                 purchase_score, search_intent, price_segment,
+                 trend, trend_reason)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            session_id, now, genre,
+            kw.get("keyword", ""),
+            kw.get("purchase_score", 0),
+            kw.get("search_intent", ""),
+            kw.get("price_segment", ""),
+            kw.get("trend", ""),
+            kw.get("trend_reason", ""),
+        ))
+
+    conn.commit()
+    conn.close()
+    return session_id
+
+
+def get_trend_sessions(genre: str = "") -> list:
+    """
+    トレンドセッション一覧を返す。
+    genre を指定するとそのジャンルのみ絞り込む。
+    """
+    conn = get_connection()
+    cur  = conn.cursor()
+    if genre:
+        cur.execute("""
+            SELECT * FROM trend_sessions
+            WHERE genre = ?
+            ORDER BY id DESC
+        """, (genre,))
+    else:
+        cur.execute("""
+            SELECT * FROM trend_sessions
+            ORDER BY id DESC
+        """)
+    rows = [dict(row) for row in cur.fetchall()]
+    conn.close()
+    return rows
+
+
+def get_trend_keywords_by_genre(genre: str) -> list:
+    """
+    指定ジャンルの全キーワードトレンドデータを時系列で返す。
+    グラフ描画に使う。
+    """
+    conn = get_connection()
+    cur  = conn.cursor()
+    cur.execute("""
+        SELECT
+            tk.*,
+            ts.created_at AS session_date,
+            ts.genre_trend
+        FROM trend_keywords tk
+        JOIN trend_sessions ts ON tk.session_id = ts.id
+        WHERE tk.genre = ?
+        ORDER BY tk.session_id ASC
+    """, (genre,))
+    rows = [dict(row) for row in cur.fetchall()]
+    conn.close()
+    return rows
+
+
+def get_all_genres() -> list:
+    """
+    保存済みのジャンル一覧（重複なし）を返す。
+    """
+    conn = get_connection()
+    cur  = conn.cursor()
+    cur.execute("""
+        SELECT DISTINCT genre FROM trend_sessions
+        ORDER BY genre ASC
+    """)
+    rows = [row["genre"] for row in cur.fetchall()]
+    conn.close()
+    return rows
+
+
+def get_genre_avg_scores() -> list:
+    """
+    ジャンルごとの最新平均スコアを返す。
+    ジャンル比較グラフに使う。
+    """
+    conn = get_connection()
+    cur  = conn.cursor()
+    cur.execute("""
+        SELECT genre, AVG(avg_score) as avg_score, COUNT(*) as session_count
+        FROM trend_sessions
+        GROUP BY genre
+        ORDER BY avg_score DESC
+    """)
+    rows = [dict(row) for row in cur.fetchall()]
+    conn.close()
+    return rows
