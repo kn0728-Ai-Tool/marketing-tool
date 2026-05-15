@@ -148,6 +148,28 @@ html, body, [class*="css"] {
 .ad-num { position:absolute; top:10px; right:12px; font-size:11px; color:#a5b4fc; font-weight:700; }
 .ad-title-text { font-size:14px; font-weight:700; color:#3730a3; margin-bottom:6px; line-height:1.4; }
 .ad-desc-text  { font-size:12px; color:#4b5563; line-height:1.6; }
+# 感情・競合・CTA の追加情報
+        emotion     = r.get("emotion", "")
+        competitor  = r.get("competitor_position", "")
+        cta         = r.get("cta_suggestion", "")
+        lp_advice   = r.get("lp_advice", "")
+
+        if emotion or competitor or cta:
+            st.markdown(f"""
+<div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0;">
+  {"<span class='meta-chip'>😊 感情: " + emotion + "</span>" if emotion else ""}
+  {"<span class='meta-chip'>⚔️ 差別化: " + competitor + "</span>" if competitor else ""}
+  {"<span class='meta-chip'>🖱️ CTA案: " + cta + "</span>" if cta else ""}
+</div>
+""", unsafe_allow_html=True)
+
+        if lp_advice:
+            st.markdown(f"""
+<div style="background:#f0fdf4;border:1px solid #86efac;border-left:4px solid #22c55e;
+border-radius:10px;padding:10px 16px;font-size:13px;color:#14532d;margin:6px 0;">
+  🖥️ LP改善提案：{lp_advice}
+</div>
+""", unsafe_allow_html=True)
 .advice-box {
   background: linear-gradient(135deg, #fffbeb, #fef3c7);
   border: 1px solid #fcd34d;
@@ -434,6 +456,11 @@ with tab_analyze:
         kw_list = [k.strip() for k in keywords_input.strip().splitlines() if k.strip()]
         st.info(f"入力数：**{len(kw_list)}件**")
         memo = st.text_input("📝 メモ（任意）", placeholder="例：競合調査 2024年6月")
+        industry = st.text_input(
+            "🏢 業種・ジャンル（任意）",
+            placeholder="例：スマートフォン / 不動産 / 飲食店 / コスメ",
+            help="入力すると業種に合わせた分析になります",
+        )
 
     if run_button:
         if not api_key:
@@ -453,7 +480,7 @@ with tab_analyze:
             status.markdown(f"⏳ 分析中... **{kw}** ({i+1}/{len(kw_list)})")
             progress.progress((i+1)/len(kw_list))
             try:
-                data = analyze_keyword_structured(client, kw)
+                data = analyze_keyword_structured(client, kw, industry=industry)
                 results.append(data)
             except Exception as e:
                 results.append({"keyword":kw,"error":str(e)})
