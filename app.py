@@ -1,10 +1,12 @@
 # app.py  v3.0
 # 追加機能：トレンド予測グラフ・ヒートマップ・年代別AI分析（タブ④拡張）
- 
+
 import streamlit as st
 import pandas as pd
 import numpy as np
 import datetime
+from zoneinfo import ZoneInfo
+JST = ZoneInfo("Asia/Tokyo")
 import json
 import time
 import re
@@ -26,17 +28,17 @@ from database import (
     get_trend_sessions, get_trend_keywords_by_genre,
     get_all_genres, get_genre_avg_scores,
 )
- 
+
 init_db()
 init_trend_db()
- 
+
 st.set_page_config(
     page_title="🎯 AIキーワード分析ツール",
     page_icon="🎯",
     layout="wide",
     initial_sidebar_state="expanded",
 )
- 
+
 st.markdown("""
 <style>
 html, body, [class*="css"] {
@@ -161,7 +163,7 @@ html, body, [class*="css"] {
 }
 </style>
 """, unsafe_allow_html=True)
- 
+
 # =====================================
 # 定数
 # =====================================
@@ -179,7 +181,7 @@ TREND_BADGE = {
     "横ばい": '<span class="trend-badge-flat">➡️ 横ばい</span>',
     "下降":   '<span class="trend-badge-down">📉 下降</span>',
 }
- 
+
 # グラフ色（線・塗りつぶし）
 CHART_COLORS = [
     {"line": "#6366f1", "fill": "rgba(99,102,241,0.05)"},
@@ -188,12 +190,12 @@ CHART_COLORS = [
     {"line": "#ef4444", "fill": "rgba(239,68,68,0.05)"},
     {"line": "#8b5cf6", "fill": "rgba(139,92,246,0.05)"},
 ]
- 
+
 api_key = ""
 if hasattr(st, "secrets"):
     api_key = st.secrets.get("OPENAI_API_KEY", "")
- 
- 
+
+
 # =====================================
 # ヘルパー
 # =====================================
@@ -206,8 +208,8 @@ def show_empty_state(icon, title, desc):
         f'</div>',
         unsafe_allow_html=True,
     )
- 
- 
+
+
 # =====================================
 # グラフ生成関数（既存）
 # =====================================
@@ -233,7 +235,7 @@ def make_score_bar_chart(valid):
     fig.update_xaxes(showgrid=True,gridcolor="#f1f5f9")
     fig.update_yaxes(showgrid=False)
     return fig
- 
+
 def make_segment_pie_chart(seg_counts):
     labels = [f"{SEGMENT_INFO[s]['emoji']} {s}" for s,c in seg_counts.items() if c>0]
     values = [c for c in seg_counts.values() if c>0]
@@ -250,7 +252,7 @@ def make_segment_pie_chart(seg_counts):
         margin=dict(l=20,r=20,t=50,b=20), height=320,
     )
     return fig
- 
+
 def make_intent_bar_chart(valid):
     intent_counts = {}
     for r in valid:
@@ -273,7 +275,7 @@ def make_intent_bar_chart(valid):
     fig.update_yaxes(showgrid=True,gridcolor="#f1f5f9",dtick=1)
     fig.update_xaxes(showgrid=False)
     return fig
- 
+
 def make_history_line_chart(history, keyword):
     dates  = [h.get("session_date","") for h in history]
     scores = [h.get("purchase_score",0) for h in history]
@@ -295,7 +297,7 @@ def make_history_line_chart(history, keyword):
     fig.update_xaxes(showgrid=True,gridcolor="#f1f5f9")
     fig.update_yaxes(showgrid=True,gridcolor="#f1f5f9")
     return fig
- 
+
 def make_csv_bar_chart(df, x_col, y_col, title, color="#6366f1"):
     fig = go.Figure(go.Bar(
         x=df[x_col].astype(str).str[:20], y=df[y_col],
@@ -313,7 +315,7 @@ def make_csv_bar_chart(df, x_col, y_col, title, color="#6366f1"):
     fig.update_yaxes(showgrid=True,gridcolor="#f1f5f9")
     fig.update_xaxes(showgrid=False)
     return fig
- 
+
 def make_trend_line_chart(trend_data, genre):
     df = pd.DataFrame(trend_data)
     if df.empty:
@@ -343,7 +345,7 @@ def make_trend_line_chart(trend_data, genre):
     fig.update_xaxes(showgrid=True,gridcolor="#f1f5f9")
     fig.update_yaxes(showgrid=True,gridcolor="#f1f5f9")
     return fig
- 
+
 def make_heatmap_chart(trend_data, genre):
     df = pd.DataFrame(trend_data)
     if df.empty:
@@ -368,7 +370,7 @@ def make_heatmap_chart(trend_data, genre):
         xaxis=dict(tickangle=-30),
     )
     return fig
- 
+
 def make_ranking_chart(trend_data, genre):
     df = pd.DataFrame(trend_data)
     if df.empty:
@@ -397,7 +399,7 @@ def make_ranking_chart(trend_data, genre):
     fig.update_xaxes(showgrid=True,gridcolor="#f1f5f9")
     fig.update_yaxes(showgrid=False)
     return fig
- 
+
 def make_genre_compare_chart(genre_scores):
     if not genre_scores:
         return go.Figure()
@@ -423,8 +425,8 @@ def make_genre_compare_chart(genre_scores):
     fig.update_yaxes(showgrid=True,gridcolor="#f1f5f9")
     fig.update_xaxes(showgrid=False)
     return fig
- 
- 
+
+
 # =====================================
 # キーワードカード表示
 # =====================================
@@ -439,7 +441,7 @@ def render_keyword_cards(filtered: list):
         competitor = r.get("competitor_position","")
         cta        = r.get("cta_suggestion","")
         lp_advice  = r.get("lp_advice","")
- 
+
         st.markdown(
             f'<div class="kw-card">'
             f'<div class="kw-title">{info["emoji"]} {r["keyword"]}</div>'
@@ -475,7 +477,7 @@ def render_keyword_cards(filtered: list):
                 )
                 with st.expander("📋 コピー", expanded=False):
                     st.code(f"【タイトル】{title_text}\n【説明文】{desc_text}", language=None)
- 
+
         chips = ""
         if emotion:    chips += f'<span class="meta-chip">😊 感情: {emotion}</span>'
         if competitor: chips += f'<span class="meta-chip">⚔️ 差別化: {competitor}</span>'
@@ -485,8 +487,8 @@ def render_keyword_cards(filtered: list):
         if lp_advice:
             st.markdown(f'<div class="lp-advice-box">🖥️ LP改善提案：{lp_advice}</div>', unsafe_allow_html=True)
         st.markdown(f'<div class="advice-box">💡 アドバイス：{r.get("advice","")}</div><br>', unsafe_allow_html=True)
- 
- 
+
+
 # =====================================
 # サイドバー
 # =====================================
@@ -509,8 +511,8 @@ with st.sidebar:
         st.markdown(f"{info['emoji']} **{seg}**  \n{info['strategy']}\n")
     st.markdown("---")
     st.caption("v3.0 | Powered by OpenAI")
- 
- 
+
+
 # =====================================
 # ヒーローバナー
 # =====================================
@@ -524,8 +526,8 @@ st.markdown("""
   </div>
 </div>
 """, unsafe_allow_html=True)
- 
- 
+
+
 # =====================================
 # タブ定義
 # =====================================
@@ -538,8 +540,8 @@ tab_analyze, tab_result, tab_chart, tab_trend, tab_csv, tab_history, tab_guide =
     "🗄️ 分析履歴",
     "📖 使い方ガイド",
 ])
- 
- 
+
+
 # =====================================
 # タブ①：キーワード分析
 # =====================================
@@ -559,7 +561,7 @@ with tab_analyze:
         st.info(f"入力数：**{len(kw_list)}件**")
         memo     = st.text_input("📝 メモ（任意）", placeholder="例：競合調査 2024年6月")
         industry = st.text_input("🏢 業種・ジャンル（任意）", placeholder="例：スマートフォン / 不動産")
- 
+
     if run_button:
         if not api_key:
             st.error("⚠️ サイドバーにAPIキーを入力してください。")
@@ -586,8 +588,8 @@ with tab_analyze:
             session_id = save_session(results, memo=memo)
             status.success(f"✅ {len(kw_list)}件の分析完了！（セッションID: {session_id}）")
             st.session_state["results"] = results
- 
- 
+
+
 # =====================================
 # タブ②：分析結果
 # =====================================
@@ -654,7 +656,7 @@ with tab_result:
             st.dataframe(df, use_container_width=True, hide_index=True)
             st.markdown("---")
             st.markdown('<p class="section-title">💾 データ保存</p>', unsafe_allow_html=True)
-            now        = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            now        = datetime.datetime.now(JST).strftime("%Y%m%d_%H%M%S")
             csv_data   = df.to_csv(index=False,encoding="utf-8-sig").encode("utf-8-sig")
             json_data  = json.dumps(results,ensure_ascii=False,indent=2).encode("utf-8")
             html_report = generate_html_report(results=filtered, title="AIキーワード分析レポート",
@@ -675,8 +677,8 @@ with tab_result:
             st.caption("ダウンロードしたHTMLをブラウザで開いて Ctrl+P → 「PDFとして保存」でPDF化できます。")
             with st.expander("レポートのプレビューを表示", expanded=False):
                 st.components.v1.html(html_report, height=600, scrolling=True)
- 
- 
+
+
 # =====================================
 # タブ③：グラフ分析
 # =====================================
@@ -709,15 +711,15 @@ with tab_chart:
 | 🎯 価格帯別分布 | 多い層の広告文を優先的に強化する |
 | 🔍 検索意図別件数 | 「購買直前」が多ければ直接訴求が有効 |
 """)
- 
- 
+
+
 # =====================================
 # タブ④：トレンド分析（Google Trends 実データ）v3.1
 # =====================================
 with tab_trend:
     st.markdown('<p class="section-title">📈 日本市場 トレンド分析</p>', unsafe_allow_html=True)
     st.caption("Google Trendsの実データを使って、日本市場における検索ボリュームの推移をリアルタイムで分析します。")
- 
+
     # ====================================================
     # ① トレンド予測（独立セクション・常時表示）
     # ====================================================
@@ -734,7 +736,7 @@ with tab_trend:
             forecast_weeks = st.number_input(
                 "予測週数", min_value=4, max_value=52, value=12, step=4, key="pred_weeks"
             )
- 
+
         if st.button("📊 予測を実行", key="btn_predict"):
             if not pred_keyword:
                 st.warning("⚠️ キーワードを入力してください。")
@@ -745,13 +747,13 @@ with tab_trend:
                         pytrends = TrendReq(hl="ja-JP", tz=540)
                         pytrends.build_payload([pred_keyword], timeframe="today 12-m", geo="JP")
                         df_pred_raw = pytrends.interest_over_time()
- 
+
                         if df_pred_raw.empty or pred_keyword not in df_pred_raw.columns:
                             st.warning("データが取得できませんでした。別のキーワードをお試しください。")
                         else:
                             dates_p  = df_pred_raw.index.strftime("%Y-%m-%d").tolist()
                             values_p = df_pred_raw[pred_keyword].tolist()
- 
+
                             xp = np.arange(len(values_p), dtype=float)
                             yp = np.array(values_p, dtype=float)
                             coeffs_p = np.polyfit(xp, yp, 1)
@@ -761,7 +763,7 @@ with tab_trend:
                             ss_tot_p = np.sum((yp - np.mean(yp)) ** 2)
                             r2_p     = float(1 - ss_res_p / ss_tot_p) if ss_tot_p != 0 else 0.0
                             std_p    = float(np.std(yp - yhat_p))
- 
+
                             fw = int(forecast_weeks)
                             last_dt_p    = datetime.datetime.strptime(dates_p[-1], "%Y-%m-%d")
                             future_dates_p = [(last_dt_p + datetime.timedelta(weeks=i+1)).strftime("%Y-%m-%d") for i in range(fw)]
@@ -770,9 +772,9 @@ with tab_trend:
                             future_yp_c  = np.clip(future_yp, 0, 100).tolist()
                             upper_p      = np.clip(future_yp + 1.96 * std_p, 0, 100).tolist()
                             lower_p      = np.clip(future_yp - 1.96 * std_p, 0, 100).tolist()
- 
+
                             trend_label_p = "📈 上昇傾向" if slope_p > 0.3 else ("📉 下降傾向" if slope_p < -0.3 else "➡️ 横ばい")
- 
+
                             st.session_state["pred_result"] = {
                                 "keyword": pred_keyword,
                                 "dates": dates_p, "values": values_p,
@@ -785,14 +787,14 @@ with tab_trend:
                             }
                     except Exception as e:
                         st.error(f"エラーが発生しました: {e}")
- 
+
         if "pred_result" in st.session_state:
             pr = st.session_state["pred_result"]
             m1, m2, m3 = st.columns(3)
             m1.metric("トレンド判定",  pr["trend_label"])
             m2.metric("週あたり変化",  f'{pr["slope"]:+.2f} pt')
             m3.metric("モデル精度 R²", f'{pr["r2"]:.3f}')
- 
+
             fig_pred = go.Figure()
             fig_pred.add_trace(go.Scatter(
                 x=pr["dates"], y=pr["values"],
@@ -821,9 +823,9 @@ with tab_trend:
             )
             fig_pred.add_vline(x=pr["dates"][-1], line_dash="dot", line_color="gray", annotation_text="現在")
             st.plotly_chart(fig_pred, use_container_width=True)
- 
+
     st.markdown("---")
- 
+
     # ---- 入力エリア ----
     col_kws, col_opts = st.columns([2,1])
     with col_kws:
@@ -848,9 +850,9 @@ with tab_trend:
         st.markdown("<br>", unsafe_allow_html=True)
         trend_run = st.button("🔍 市場トレンドを取得", type="primary", use_container_width=True)
         st.caption("※ Google Trendsへのアクセスのため\n取得に10〜20秒かかります")
- 
+
     trend_kw_list = [k.strip() for k in trend_keywords_input.strip().splitlines() if k.strip()]
- 
+
     if trend_run:
         if not trend_kw_list:
             st.warning("⚠️ キーワードを1つ以上入力してください。")
@@ -871,7 +873,7 @@ with tab_trend:
                 except Exception as e:
                     st.error(f"データ取得中にエラーが発生しました: {e}")
                     st.info("Google Trendsへのアクセスが一時的に制限されている場合があります。1〜2分後に再試行してください。")
- 
+
     # ---- 取得済みデータの表示 ----
     if "market_data" not in st.session_state:
         show_empty_state("📈","市場トレンドデータがありません",
@@ -881,7 +883,7 @@ with tab_trend:
         kws         = st.session_state.get("market_keywords",[])
         trend_df    = market_data.get("trend_df", pd.DataFrame())
         summaries   = market_data.get("summaries",[])
- 
+
         # ---- サマリーカード ----
         st.markdown('<p class="section-title">📊 キーワード別サマリー</p>', unsafe_allow_html=True)
         if summaries:
@@ -909,9 +911,9 @@ with tab_trend:
                     )
         else:
             st.info("サマリーデータがありません。")
- 
+
         st.markdown("---")
- 
+
         # ---- 時系列グラフ ----
         if not trend_df.empty:
             st.markdown('<p class="section-title">📈 検索ボリューム推移（Google Trends）</p>', unsafe_allow_html=True)
@@ -943,9 +945,9 @@ with tab_trend:
             )
             st.plotly_chart(fig, use_container_width=True)
             st.caption("※ Google Trendsの数値は絶対的な検索数ではなく、期間内の最高値を100とした相対的な人気度です。")
- 
+
         st.markdown("---")
- 
+
         # ---- 地域別グラフ ----
         region_df = market_data.get("region_df", pd.DataFrame())
         if not region_df.empty:
@@ -983,7 +985,7 @@ with tab_trend:
                     st.markdown('</div>', unsafe_allow_html=True)
                     st.caption("※ 最も検索している地域が100、それに対する相対値で表示")
             st.markdown("---")
- 
+
         # ---- 関連キーワード ----
         related_queries = market_data.get("related_queries",{})
         if related_queries:
@@ -1010,7 +1012,7 @@ with tab_trend:
                         st.caption("関連キーワードが見つかりませんでした")
                     st.markdown('</div>', unsafe_allow_html=True)
             st.markdown("---")
- 
+
         # ---- 最新ニュース ----
         news_data = market_data.get("news",{})
         if news_data:
@@ -1034,7 +1036,7 @@ with tab_trend:
                     )
                 st.markdown("")
             st.markdown("---")
- 
+
         # ---- AIによる市場分析 ----
         st.markdown('<p class="section-title">🤖 AIによる市場トレンド分析</p>', unsafe_allow_html=True)
         st.caption("取得したGoogle Trendsデータをもとに、AIが市場動向と広告戦略を分析します。")
@@ -1060,13 +1062,13 @@ with tab_trend:
                                 {"role":"system","content":"あなたは日本市場のデジタルマーケティング専門家です。"},
                                 {"role":"user","content":f"""
 以下のGoogle Trendsデータと最新ニュースをもとに、日本市場のトレンドを分析してください。
- 
+
 【Google Trends サマリー】
 {summary_text}
- 
+
 【最新ニュース】
 {news_text}
- 
+
 以下の観点で分析し、マーケターが今すぐ使える具体的な提言を日本語で述べてください：
 1. 市場全体のトレンド解説（2〜3文）
 2. 注目すべきキーワードとその理由
@@ -1080,7 +1082,7 @@ with tab_trend:
                         st.session_state["market_ai_comment"] = response.choices[0].message.content
                     except Exception as e:
                         st.error(f"AI分析中にエラーが発生しました: {e}")
- 
+
             if "market_ai_comment" in st.session_state:
                 comment_html = st.session_state["market_ai_comment"].replace("\n","<br>")
                 st.markdown(
@@ -1089,15 +1091,15 @@ with tab_trend:
                     f'</div>',
                     unsafe_allow_html=True,
                 )
- 
- 
+
+
         # ====================================================
         # ② ヒートマップ（トレンド分析後に自動表示）
         # ====================================================
         st.markdown("---")
         st.markdown('<p class="section-title">🟥 曜日×時間帯 ヒートマップ</p>', unsafe_allow_html=True)
         st.caption("トレンド分析で取得したキーワードの検索アクティビティを曜日×時間帯で自動表示します。広告配信の最適時間帯発見に活用できます。")
- 
+
         heat_kw_target = kws[0] if kws else ""
         if heat_kw_target:
             try:
@@ -1108,13 +1110,13 @@ with tab_trend:
                     65, 68, 70, 72, 75, 78, 80, 75, 65, 50, 35, 18,
                 ], dtype=float)
                 day_coeff_h = np.array([1.0, 1.0, 1.0, 1.0, 1.1, 1.2, 1.1])
- 
+
                 if not trend_df.empty and heat_kw_target in trend_df.columns:
                     weekly_vals_h = trend_df[heat_kw_target].tolist()
                     scale_h = float(np.mean(weekly_vals_h[-4:])) / 70.0 if len(weekly_vals_h) >= 4 else 1.0
                 else:
                     scale_h = 1.0
- 
+
                 rng_h = np.random.default_rng(abs(hash(heat_kw_target)) % (2**32))
                 matrix_h = []
                 for d_idx in range(7):
@@ -1124,7 +1126,7 @@ with tab_trend:
                         val_h = float(np.clip(val_h * rng_h.uniform(0.9, 1.1), 0, 100))
                         row_h.append(round(val_h, 1))
                     matrix_h.append(row_h)
- 
+
                 fig_heat = go.Figure(data=go.Heatmap(
                     z=matrix_h,
                     x=[f"{h:02d}:00" for h in hours_h],
@@ -1142,24 +1144,24 @@ with tab_trend:
                 )
                 st.plotly_chart(fig_heat, use_container_width=True)
                 st.caption("※ 時間帯データは週次トレンドと一般的な検索行動モデルから推定した値です。")
- 
+
                 matrix_np_h = np.array(matrix_h)
                 peak_idx_h  = int(np.argmax(matrix_np_h))
                 st.info(f"📌 最も検索が活発な時間帯：**{days_h[peak_idx_h // 24]}曜日 {peak_idx_h % 24:02d}:00〜{peak_idx_h % 24 + 1:02d}:00**")
- 
+
             except Exception as e:
                 st.error(f"ヒートマップ生成中にエラーが発生しました: {e}")
- 
+
         # ====================================================
         # ③ 年代別分析（折りたたみ表示・ボタン実行）
         # ====================================================
         st.markdown("---")
         with st.expander("👥 年代別 AI分析（クリックして展開）", expanded=False):
             st.caption("OpenAI API が各年代の関心度・購買意向・効果的な訴求チャネルを分析します。分析するキーワードはトレンド分析で取得した1件目が自動入力されます。")
- 
+
             DEFAULT_RANGES = [(10,19),(20,29),(30,39),(40,49),(50,59),(60,79)]
             DEFAULT_LABELS = ["10代","20代","30代","40代","50代","60代以上"]
- 
+
             age_kw_default = kws[0] if kws else ""
             age_keyword = st.text_input(
                 "年代別分析するキーワード",
@@ -1167,7 +1169,7 @@ with tab_trend:
                 placeholder="例: サブスクリプションサービス",
                 key="age_kw",
             )
- 
+
             use_custom = st.checkbox("年代グループをカスタマイズする", value=False, key="age_custom")
             if use_custom:
                 num_groups = st.slider("グループ数", 2, 6, 4, key="age_num")
@@ -1184,7 +1186,7 @@ with tab_trend:
             else:
                 age_groups = [{"label": DEFAULT_LABELS[i], "min": DEFAULT_RANGES[i][0], "max": DEFAULT_RANGES[i][1]} for i in range(len(DEFAULT_LABELS))]
                 st.markdown("**デフォルト設定：** " + "　".join(DEFAULT_LABELS))
- 
+
             if st.button("🧠 年代別AI分析を実行", key="btn_age"):
                 if not age_keyword:
                     st.warning("⚠️ キーワードを入力してください。")
@@ -1198,13 +1200,13 @@ with tab_trend:
                             age_prompt = f"""
 あなたはマーケティングデータアナリストです。
 以下のキーワードについて、指定された年代別に詳細な分析を行ってください。
- 
+
 キーワード: 「{age_keyword}」
 分析対象の年代: {age_labels_str}
- 
+
 各年代について、以下の情報をJSON形式で返してください。
 JSON以外のテキストは一切出力しないでください。
- 
+
 {{
   "age_groups": [
     {{
@@ -1238,17 +1240,17 @@ JSON以外のテキストは一切出力しないでください。
                             st.error("AIの応答のパースに失敗しました。もう一度お試しください。")
                         except Exception as e:
                             st.error(f"エラーが発生しました: {e}")
- 
+
             if "age_result" in st.session_state:
                 result_age   = st.session_state["age_result"]
                 age_kw_used  = st.session_state.get("age_kw_used", "")
                 age_grp_list = result_age.get("age_groups", [])
- 
+
                 if age_grp_list:
                     labels_plot   = [g["label"]               for g in age_grp_list]
                     interest_vals = [g.get("interest", 0)     for g in age_grp_list]
                     purchase_vals = [g.get("purchase_rate", 0) for g in age_grp_list]
- 
+
                     fig_age = go.Figure()
                     fig_age.add_trace(go.Bar(name="関心度", x=labels_plot, y=interest_vals,
                         marker_color="#3b82f6", text=interest_vals, textposition="outside"))
@@ -1262,7 +1264,7 @@ JSON以外のテキストは一切出力しないでください。
                         margin=dict(l=20, r=20, t=60, b=40),
                     )
                     st.plotly_chart(fig_age, use_container_width=True)
- 
+
                     st.markdown("#### 年代別詳細")
                     num_cols  = min(len(age_grp_list), 3)
                     card_cols = st.columns(num_cols)
@@ -1279,11 +1281,11 @@ JSON以外のテキストは一切出力しないでください。
                                 st.markdown("**📡 効果的チャネル**")
                                 for ch in grp.get("channels",[]): st.markdown(f"- {ch}")
                                 st.markdown(f"**📝 概要**  \n{grp.get('summary','')}")
- 
+
                     st.markdown("#### 💡 総合インサイト")
                     st.info(result_age.get("overall_insight", ""))
- 
- 
+
+
 # =====================================
 # タブ⑤：CSV分析
 # =====================================
@@ -1292,7 +1294,7 @@ with tab_csv:
     st.caption("Google Ads・SEOツール・Excelなど、どんな形式のCSVでも自動で読み込んでAIが分析します。")
     uploaded = st.file_uploader("CSVファイルをアップロード", type=["csv"],
         help="UTF-8またはShift-JIS（Excel保存のCSV）に対応しています。")
- 
+
     if uploaded is None:
         show_empty_state("📂","CSVファイルをアップロードしてください",
             "Google Ads・SEOツール・Excelなど形式を問わず分析できます。\nキーワード・CTR・CPC・CVR・CPAなどを自動で認識します。")
@@ -1303,25 +1305,25 @@ with tab_csv:
             except UnicodeDecodeError:
                 uploaded.seek(0)
                 df_raw = pd.read_csv(uploaded, encoding="shift-jis")
- 
+
             col_map = detect_columns(df_raw)
             df_prep = prepare_dataframe(df_raw, col_map)
- 
+
             st.markdown('<p class="section-title">📋 読み込んだデータ</p>', unsafe_allow_html=True)
             m1,m2,m3 = st.columns(3)
             m1.metric("総行数",   f"{len(df_raw)}行")
             m2.metric("総列数",   f"{len(df_raw.columns)}列")
             m3.metric("検出指標", f"{len(col_map)}項目")
- 
+
             if col_map:
                 chip_html = "".join(f'<span class="meta-chip">✅ {k} → {v}</span>' for k,v in col_map.items())
                 st.markdown(f'<div style="display:flex;flex-wrap:wrap;gap:6px;margin:8px 0;">{chip_html}</div>', unsafe_allow_html=True)
             else:
                 st.warning("標準的なマーケティング指標の列が検出できませんでした。")
- 
+
             with st.expander("データプレビュー（先頭10行）", expanded=False):
                 st.dataframe(df_raw.head(10), use_container_width=True, hide_index=True)
- 
+
             st.markdown("---")
             st.markdown('<p class="section-title">📊 データの可視化</p>', unsafe_allow_html=True)
             chart_pairs = [
@@ -1348,12 +1350,12 @@ with tab_csv:
                         shown += 1
             if shown == 0:
                 st.info("グラフを表示するにはキーワード列と数値列が必要です。")
- 
+
             st.markdown("---")
             st.markdown('<p class="section-title">🤖 AIによるトレンド・改善点の自動抽出</p>', unsafe_allow_html=True)
             csv_industry = st.text_input("🏢 業種・ジャンル（任意）", placeholder="例：ECサイト / 不動産", key="csv_industry")
             csv_question = st.text_input("💬 特に知りたいこと（任意）", placeholder="例：CVRが低いキーワードの原因を知りたい", key="csv_question")
- 
+
             if not api_key:
                 st.warning("⚠️ サイドバーにAPIキーを入力すると、AIによる分析ができます。")
             else:
@@ -1366,7 +1368,7 @@ with tab_csv:
                             st.session_state["csv_ai_result"] = ai_result
                         except Exception as e:
                             st.error(f"AI分析中にエラーが発生しました: {e}")
- 
+
             if "csv_ai_result" in st.session_state:
                 ai = st.session_state["csv_ai_result"]
                 if ai.get("summary"):
@@ -1419,14 +1421,14 @@ with tab_csv:
                 st.markdown("---")
                 ai_json = json.dumps(ai,ensure_ascii=False,indent=2).encode("utf-8")
                 st.download_button("📥 AI分析結果をJSONでダウンロード",data=ai_json,
-                    file_name=f"csv_analysis_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+                    file_name=f"csv_analysis_{datetime.datetime.now(JST).strftime('%Y%m%d_%H%M%S')}.json",
                     mime="application/json")
- 
+
         except Exception as e:
             st.error(f"CSVの読み込みに失敗しました: {e}")
             st.info("ファイルの文字コードがUTF-8またはShift-JISであることを確認してください。")
- 
- 
+
+
 # =====================================
 # タブ⑥：分析履歴
 # =====================================
@@ -1492,8 +1494,8 @@ with tab_history:
                     "推奨戦略":     info.get("strategy",""),
                 })
             st.dataframe(pd.DataFrame(stat_rows), use_container_width=True, hide_index=True)
- 
- 
+
+
 # =====================================
 # タブ⑦：使い方ガイド
 # =====================================
@@ -1502,12 +1504,12 @@ with tab_guide:
     st.markdown("""
 ### 🔍 キーワード分析タブ
 1行1つ・最大20件まで分析できます。業種を入力すると精度が上がります。
- 
+
 ---
- 
+
 ### 📈 トレンド分析タブ
 Google Trendsの実データで日本市場の検索ボリューム推移を分析します。
- 
+
 | できること | 説明 |
 |-----------|------|
 | 検索ボリューム推移 | 期間内の相対的な人気度を折れ線グラフで表示 |
@@ -1518,18 +1520,18 @@ Google Trendsの実データで日本市場の検索ボリューム推移を分�
 | 📈 トレンド予測 | 過去データから線形回帰で将来トレンドを予測（v3.0） |
 | 🟥 ヒートマップ | 曜日×時間帯の検索アクティビティを可視化（v3.0） |
 | 👥 年代別分析 | AIが各年代の関心度・購買意向を分析（v3.0） |
- 
+
 💡 **コツ：同じキーワードを定期的に取得すると市場の変化を追えます**
- 
+
 ---
- 
+
 ### 📂 CSV分析タブ
 CSVをアップロードするだけでAIが自動分析します。
- 
+
 ---
- 
+
 ### 💡 価格帯別の広告戦略
- 
+
 | 価格帯 | 主な訴求軸 | キーワード例 |
 |--------|-----------|-------------|
 | 💚 Budget | コスパ・割引・最安値 | 格安・安い・お得 |
@@ -1537,4 +1539,3 @@ CSVをアップロードするだけでAIが自動分析します。
 | 💜 Premium | 品質・体験・専門性 | 高品質・こだわり・プロ |
 | 🖤 Luxury | ブランド・希少性・限定 | 高級・限定・ブランド |
 """)
- 
