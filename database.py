@@ -3,17 +3,21 @@
 # SQLite データベース操作モジュール
 # 分析結果の保存・取得・削除を担当
 # =====================================
-
+ 
 import sqlite3
 import json
 import datetime
+from zoneinfo import ZoneInfo
 from pathlib import Path
-
+ 
+# 日本時間（JST）
+JST = ZoneInfo("Asia/Tokyo")
+ 
 # DBファイルの保存場所
 # Streamlit Cloud では /tmp に書き込む（再起動でリセットされる点に注意）
 DB_PATH = Path("/tmp/keyword_analysis.db")
-
-
+ 
+ 
 def get_connection() -> sqlite3.Connection:
     """
     DBへの接続を返す。
@@ -22,8 +26,8 @@ def get_connection() -> sqlite3.Connection:
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row  # カラム名でアクセス可能にする
     return conn
-
-
+ 
+ 
 def init_db() -> None:
     """
     DBとテーブルを初期化する。
@@ -31,7 +35,7 @@ def init_db() -> None:
     """
     conn = get_connection()
     cur  = conn.cursor()
-
+ 
     # 分析セッションテーブル
     # 1回の「分析開始」ボタン押下を1セッションとして記録する
     cur.execute("""
@@ -42,7 +46,7 @@ def init_db() -> None:
             memo        TEXT    DEFAULT ''
         )
     """)
-
+ 
     # キーワード分析結果テーブル
     # セッションに紐づく個々のキーワード結果を保存する
     cur.execute("""
@@ -61,33 +65,33 @@ def init_db() -> None:
             FOREIGN KEY (session_id) REFERENCES analysis_sessions(id)
         )
     """)
-
+ 
     conn.commit()
     conn.close()
-
-
+ 
+ 
 def save_session(results: list, memo: str = "") -> int:
     """
     1回の分析セッションをDBに保存する。
     戻り値: 保存したセッションID
     """
-    now  = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    now  = datetime.datetime.now(JST).strftime("%Y-%m-%d %H:%M:%S")
     conn = get_connection()
     cur  = conn.cursor()
-
+ 
     # セッションを保存
     cur.execute("""
         INSERT INTO analysis_sessions (created_at, kw_count, memo)
         VALUES (?, ?, ?)
     """, (now, len(results), memo))
-
+ 
     session_id = cur.lastrowid  # 保存したセッションのIDを取得
-
+ 
     # 各キーワードの結果を保存
     for r in results:
         if "error" in r:
             continue  # エラーのキーワードはスキップ
-
+ 
         cur.execute("""
             INSERT INTO keyword_results (
                 session_id, created_at, keyword,
@@ -107,12 +111,12 @@ def save_session(results: list, memo: str = "") -> int:
             r.get("advice", ""),
             json.dumps(r.get("ad_copies", []), ensure_ascii=False),
         ))
-
+ 
     conn.commit()
     conn.close()
     return session_id
-
-
+ 
+ 
 def get_all_sessions() -> list:
     """
     全セッションを新しい順で返す。
@@ -126,8 +130,8 @@ def get_all_sessions() -> list:
     rows = [dict(row) for row in cur.fetchall()]
     conn.close()
     return rows
-
-
+ 
+ 
 def get_session_results(session_id: int) -> list:
     """
     指定セッションのキーワード結果を返す。
@@ -141,7 +145,7 @@ def get_session_results(session_id: int) -> list:
     """, (session_id,))
     rows = cur.fetchall()
     conn.close()
-
+ 
     # ad_copies_json を元のリストに戻す
     results = []
     for row in rows:
@@ -151,10 +155,10 @@ def get_session_results(session_id: int) -> list:
         except Exception:
             r["ad_copies"] = []
         results.append(r)
-
+ 
     return results
-
-
+ 
+ 
 def get_keyword_history(keyword: str) -> list:
     """
     特定のキーワードの分析履歴を時系列で返す。
@@ -174,8 +178,8 @@ def get_keyword_history(keyword: str) -> list:
     rows = [dict(row) for row in cur.fetchall()]
     conn.close()
     return rows
-
-
+ 
+ 
 def get_all_keywords() -> list:
     """
     保存済みの全キーワード一覧（重複なし）を返す。
@@ -189,8 +193,8 @@ def get_all_keywords() -> list:
     rows = [row["keyword"] for row in cur.fetchall()]
     conn.close()
     return rows
-
-
+ 
+ 
 def delete_session(session_id: int) -> None:
     """
     指定セッションとその結果を削除する。
@@ -201,8 +205,8 @@ def delete_session(session_id: int) -> None:
     cur.execute("DELETE FROM analysis_sessions WHERE id = ?",         (session_id,))
     conn.commit()
     conn.close()
-
-
+ 
+ 
 def get_segment_stats() -> dict:
     """
     全履歴での価格帯別の平均購買意欲スコアを返す。
@@ -220,11 +224,12 @@ def get_segment_stats() -> dict:
     rows = {row["price_segment"]: dict(row) for row in cur.fetchall()}
     conn.close()
     return rows
-    
+ 
+ 
 # =====================================
 # トレンド分析用テーブルの追加
 # =====================================
-
+ 
 def init_trend_db() -> None:
     """
     トレンド分析用のテーブルを初期化する。
@@ -232,7 +237,7 @@ def init_trend_db() -> None:
     """
     conn = get_connection()
     cur  = conn.cursor()
-
+ 
     # ジャンルごとのトレンドセッションテーブル
     cur.execute("""
         CREATE TABLE IF NOT EXISTS trend_sessions (
@@ -245,7 +250,7 @@ def init_trend_db() -> None:
             ai_insight  TEXT
         )
     """)
-
+ 
     # キーワードごとのトレンド結果テーブル
     cur.execute("""
         CREATE TABLE IF NOT EXISTS trend_keywords (
@@ -262,20 +267,20 @@ def init_trend_db() -> None:
             FOREIGN KEY (session_id) REFERENCES trend_sessions(id)
         )
     """)
-
+ 
     conn.commit()
     conn.close()
-
-
+ 
+ 
 def save_trend_session(genre: str, result: dict) -> int:
     """
     トレンド分析結果をDBに保存する。
     戻り値: 保存したセッションID
     """
-    now  = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    now  = datetime.datetime.now(JST).strftime("%Y-%m-%d %H:%M:%S")
     conn = get_connection()
     cur  = conn.cursor()
-
+ 
     cur.execute("""
         INSERT INTO trend_sessions
             (created_at, genre, kw_count, avg_score, genre_trend, ai_insight)
@@ -289,7 +294,7 @@ def save_trend_session(genre: str, result: dict) -> int:
         result.get("ai_insight", ""),
     ))
     session_id = cur.lastrowid
-
+ 
     for kw in result.get("keywords", []):
         cur.execute("""
             INSERT INTO trend_keywords
@@ -306,12 +311,12 @@ def save_trend_session(genre: str, result: dict) -> int:
             kw.get("trend", ""),
             kw.get("trend_reason", ""),
         ))
-
+ 
     conn.commit()
     conn.close()
     return session_id
-
-
+ 
+ 
 def get_trend_sessions(genre: str = "") -> list:
     """
     トレンドセッション一覧を返す。
@@ -333,8 +338,8 @@ def get_trend_sessions(genre: str = "") -> list:
     rows = [dict(row) for row in cur.fetchall()]
     conn.close()
     return rows
-
-
+ 
+ 
 def get_trend_keywords_by_genre(genre: str) -> list:
     """
     指定ジャンルの全キーワードトレンドデータを時系列で返す。
@@ -355,8 +360,8 @@ def get_trend_keywords_by_genre(genre: str) -> list:
     rows = [dict(row) for row in cur.fetchall()]
     conn.close()
     return rows
-
-
+ 
+ 
 def get_all_genres() -> list:
     """
     保存済みのジャンル一覧（重複なし）を返す。
@@ -370,8 +375,8 @@ def get_all_genres() -> list:
     rows = [row["genre"] for row in cur.fetchall()]
     conn.close()
     return rows
-
-
+ 
+ 
 def get_genre_avg_scores() -> list:
     """
     ジャンルごとの最新平均スコアを返す。
@@ -388,3 +393,4 @@ def get_genre_avg_scores() -> list:
     rows = [dict(row) for row in cur.fetchall()]
     conn.close()
     return rows
+ 
