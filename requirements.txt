@@ -1,5 +1,20 @@
-openai
-pandas
-streamlit
-plotly
-pytrends
+# ──────────────────────────────────────────────────────
+# requirements_additions.txt
+# 以下の行を既存の requirements.txt に追記してください。
+# すでに記載済みのものは追加不要です。
+# ──────────────────────────────────────────────────────
+
+# 線形回帰・数値計算（trend_analyzer.py の predict_trend で使用）
+numpy>=1.26.0
+
+# データ処理（既存で使用済みの場合は追記不要）
+pandas>=2.0.0
+
+# グラフ描画（既存で使用済みの場合は追記不要）
+plotly>=5.18.0
+
+# OpenAI クライアント（既存で使用済みの場合は追記不要）
+openai>=1.12.0
+
+# Google Trends（既存で使用済みの場合は追記不要）
+pytrends>=4.9.2
