@@ -701,7 +701,7 @@ tab_analyze, tab_result, tab_chart, tab_trend, tab_csv, tab_summary, tab_digest,
     "分析結果",
     "グラフ分析",
     "トレンド分析",
-    "CSV分析",
+    "CSV分析 & 集計",
     "文章要約・整形",
     "ダイジェスト & プレゼン",
     "分析履歴",
@@ -1458,7 +1458,7 @@ JSON以外のテキストは一切出力しないでください。
 
 
 # =====================================
-# タブ⑤：CSV分析
+# タブ⑤：CSV分析 & 集計
 # =====================================
 with tab_csv:
     st.markdown('<p class="section-title">CSV アップロード & AI 分析</p>', unsafe_allow_html=True)
