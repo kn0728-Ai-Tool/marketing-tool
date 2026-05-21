@@ -94,13 +94,31 @@ html, body, [class*="css"] {
   gap: 2px;
   border-bottom: 1px solid #e2e8f0;
   background: transparent;
+  /* 横スクロール有効・スクロールバー常時表示 */
   overflow-x: auto !important;
+  overflow-y: visible !important;
   scroll-behavior: smooth;
-  -ms-overflow-style: none;
-  scrollbar-width: none;
+  padding-bottom: 6px;   /* スクロールバーの分だけ下に余白 */
+  /* スクロールバーのデザイン（WebKit系: Chrome/Edge/Safari）*/
+  scrollbar-width: auto;          /* Firefox: auto = 通常サイズ */
+  scrollbar-color: #4338ca #e2e8f0; /* Firefox: つまみ色 トラック色 */
 }
+/* Chrome / Edge / Safari 用スクロールバー */
 .stTabs [data-baseweb="tab-list"]::-webkit-scrollbar {
-  display: none;
+  height: 6px;          /* スクロールバーの太さ */
+  display: block;
+}
+.stTabs [data-baseweb="tab-list"]::-webkit-scrollbar-track {
+  background: #e2e8f0;  /* トラック（背景）*/
+  border-radius: 99px;
+}
+.stTabs [data-baseweb="tab-list"]::-webkit-scrollbar-thumb {
+  background: #4338ca;  /* つまみ（ドラッグ部分）*/
+  border-radius: 99px;
+  min-width: 40px;      /* つまみの最小幅 */
+}
+.stTabs [data-baseweb="tab-list"]::-webkit-scrollbar-thumb:hover {
+  background: #3730a3;  /* ホバー時は少し濃く */
 }
 .stTabs [data-baseweb="tab"] {
   border-radius: 6px 6px 0 0;
@@ -112,8 +130,8 @@ html, body, [class*="css"] {
   border: 1px solid #e2e8f0;
   border-bottom: none;
   transition: all 0.15s;
-  white-space: nowrap;
-  flex-shrink: 0;
+  white-space: nowrap;  /* タブ名を折り返さない */
+  flex-shrink: 0;       /* タブが縮まないようにする */
 }
 .stTabs [data-baseweb="tab"]:hover {
   color: #4338ca;
@@ -124,45 +142,6 @@ html, body, [class*="css"] {
   color: #4338ca !important;
   border-color: #e2e8f0 !important;
   box-shadow: 0 -2px 0 #4338ca inset;
-}
-
-/* ─── カスタム タブスクロールボタン ─── */
-#tab-scroll-left, #tab-scroll-right {
-  position: fixed;
-  top: 112px;
-  z-index: 9999;
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  border: none;
-  cursor: pointer;
-  font-size: 22px;
-  font-weight: 900;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 4px 16px rgba(67,56,202,0.45);
-  transition: all 0.18s ease;
-  user-select: none;
-  line-height: 1;
-}
-#tab-scroll-left {
-  left: 250px;
-  background: linear-gradient(135deg, #4338ca, #6366f1);
-  color: white;
-}
-#tab-scroll-right {
-  left: 308px;
-  background: linear-gradient(135deg, #4338ca, #6366f1);
-  color: white;
-}
-#tab-scroll-left:hover, #tab-scroll-right:hover {
-  transform: scale(1.12);
-  box-shadow: 0 6px 22px rgba(67,56,202,0.6);
-  background: linear-gradient(135deg, #3730a3, #4338ca);
-}
-#tab-scroll-left:active, #tab-scroll-right:active {
-  transform: scale(0.95);
 }
 
 /* ─── メトリクスカード ─── */
@@ -755,68 +734,6 @@ tab_analyze, tab_result, tab_chart, tab_trend, tab_csv, tab_summary, tab_digest,
     "分析履歴",
     "使い方ガイド",
 ])
-
-
-# =====================================
-# タブ スクロールボタン（◀ ▶）注入
-# StreamlitのデフォルトUIに依存せず
-# 確実に大きく見やすいボタンを表示する
-# =====================================
-st.components.v1.html("""
-<script>
-(function() {
-  function injectScrollButtons() {
-    if (window.parent.document.getElementById('tab-scroll-left')) return;
-    var tabList = window.parent.document.querySelector('[data-baseweb="tab-list"]');
-    if (!tabList) return;
-
-    function makeBtn(id, symbol, tooltip, leftPx, scrollDir) {
-      var btn = window.parent.document.createElement('button');
-      btn.id        = id;
-      btn.innerHTML = symbol;
-      btn.title     = tooltip;
-      Object.assign(btn.style, {
-        position:       'fixed',
-        top:            '106px',
-        left:           leftPx,
-        zIndex:         '99999',
-        width:          '46px',
-        height:         '46px',
-        borderRadius:   '50%',
-        border:         '2px solid rgba(255,255,255,0.6)',
-        cursor:         'pointer',
-        fontSize:       '18px',
-        fontWeight:     '900',
-        display:        'flex',
-        alignItems:     'center',
-        justifyContent: 'center',
-        background:     'linear-gradient(135deg,#4338ca,#6366f1)',
-        color:          'white',
-        boxShadow:      '0 4px 18px rgba(67,56,202,0.55)',
-        transition:     'all 0.18s ease',
-        userSelect:     'none',
-        lineHeight:     '1',
-      });
-      btn.onmouseenter = function(){ this.style.transform='scale(1.18)'; this.style.boxShadow='0 6px 24px rgba(67,56,202,0.75)'; };
-      btn.onmouseleave = function(){ this.style.transform='scale(1)';    this.style.boxShadow='0 4px 18px rgba(67,56,202,0.55)'; };
-      btn.onmousedown  = function(){ this.style.transform='scale(0.91)'; };
-      btn.onmouseup    = function(){ this.style.transform='scale(1.18)'; };
-      btn.onclick = function(){ tabList.scrollBy({ left: scrollDir * 220, behavior: 'smooth' }); };
-      return btn;
-    }
-
-    var btnL = makeBtn('tab-scroll-left',  '&#9664;', '← タブを左へ', '252px', -1);
-    var btnR = makeBtn('tab-scroll-right', '&#9654;', 'タブを右へ →', '306px',  1);
-    window.parent.document.body.appendChild(btnL);
-    window.parent.document.body.appendChild(btnR);
-  }
-
-  setTimeout(injectScrollButtons, 900);
-  setInterval(injectScrollButtons, 2500);
-})();
-</script>
-""", height=0)
-
 
 
 # =====================================
