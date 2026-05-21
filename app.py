@@ -1522,6 +1522,35 @@ with tab_csv:
             if shown == 0:
                 st.info("グラフを表示するにはキーワード列と数値列が必要です。")
 
+
+            # ── Excelダウンロード（AI分析前でも使える） ──
+            st.markdown('<p class="section-title">📥 Excelで集計ダウンロード</p>', unsafe_allow_html=True)
+            st.caption("CSVをクリーニング（空白・重複削除）し、項目ごとに別シートで集計したExcelファイルを生成します。AI分析を実行した後に生成すると、AI分析結果のシートも含まれます。")
+            if st.button("Excelファイルを生成する", key="btn_excel_export"):
+                with st.spinner("Excelファイルを生成中...（データ量により10〜20秒かかります）"):
+                    try:
+                        from csv_analyzer import export_to_excel
+                        ai_for_excel = st.session_state.get("csv_ai_result", None)
+                        xlsx_bytes = export_to_excel(
+                            df_raw=df_raw,
+                            file_name=uploaded.name,
+                            ai_result=ai_for_excel,
+                        )
+                        st.session_state["excel_bytes"] = xlsx_bytes
+                        st.session_state["excel_fname"] = uploaded.name
+                        st.success("Excelファイルの生成が完了しました！下のボタンからダウンロードしてください。")
+                    except Exception as e:
+                        st.error(f"Excel生成エラー: {e}")
+            if "excel_bytes" in st.session_state:
+                st.download_button(
+                    label="📥 Excelをダウンロード",
+                    data=st.session_state["excel_bytes"],
+                    file_name=f"集計_{st.session_state['excel_fname'].replace('.csv','')}_{datetime.datetime.now(JST).strftime('%Y%m%d_%H%M%S')}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=False,
+                    type="primary",
+                )
+
             st.markdown("---")
             st.markdown('<p class="section-title">AI によるトレンド・改善点の自動抽出</p>', unsafe_allow_html=True)
             csv_industry = st.text_input("業種・ジャンル（任意）", placeholder="例：ECサイト / 不動産", key="csv_industry")
@@ -1590,10 +1619,19 @@ with tab_csv:
                         st.session_state["csv_keywords"] = "\n".join(selected_kws[:20])
                         st.success("「キーワード分析」タブを開いてキーワード欄を確認してください。")
                 st.markdown("---")
-                ai_json = json.dumps(ai,ensure_ascii=False,indent=2).encode("utf-8")
-                st.download_button("AI 分析結果を JSON でダウンロード",data=ai_json,
-                    file_name=f"csv_analysis_{datetime.datetime.now(JST).strftime('%Y%m%d_%H%M%S')}.json",
-                    mime="application/json")
+                ai_json = json.dumps(ai, ensure_ascii=False, indent=2).encode("utf-8")
+                dl_col1, dl_col2 = st.columns(2)
+                with dl_col1:
+                    st.download_button(
+                        label="📄 AI分析結果をJSONでダウンロード",
+                        data=ai_json,
+                        file_name=f"csv_analysis_{datetime.datetime.now(JST).strftime('%Y%m%d_%H%M%S')}.json",
+                        mime="application/json",
+                        use_container_width=True,
+                    )
+                with dl_col2:
+                    st.info("💡 AI分析結果入りExcelは上の「Excelファイルを生成する」ボタンで生成できます。")
+
 
         except Exception as e:
             st.error(f"CSVの読み込みに失敗しました: {e}")
