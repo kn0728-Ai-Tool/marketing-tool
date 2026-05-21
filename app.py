@@ -33,133 +33,298 @@ init_db()
 init_trend_db()
 
 st.set_page_config(
-    page_title="🎯 AIキーワード分析ツール",
-    page_icon="🎯",
+    page_title="AI キーワード分析ツール",
+    page_icon="◈",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
 st.markdown("""
 <style>
+/* ─── ベースフォント ─── */
 html, body, [class*="css"] {
   font-family: 'Hiragino Sans', 'Yu Gothic UI', 'Meiryo', sans-serif;
 }
+
+/* ─── ヒーローバナー ─── */
 .hero-banner {
-  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #06b6d4 100%);
-  border-radius: 16px; padding: 36px 40px; margin-bottom: 28px;
-  color: white; position: relative; overflow: hidden;
+  background: #0f172a;
+  border-radius: 12px;
+  padding: 32px 40px;
+  margin-bottom: 24px;
+  color: white;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid #1e293b;
 }
 .hero-banner::before {
-  content: ''; position: absolute; top: -40px; right: -40px;
-  width: 200px; height: 200px; background: rgba(255,255,255,0.08); border-radius: 50%;
+  content: '';
+  position: absolute;
+  top: 0; right: 0; bottom: 0; left: 0;
+  background: linear-gradient(135deg, rgba(99,102,241,0.15) 0%, rgba(6,182,212,0.08) 100%);
+  pointer-events: none;
 }
-.hero-title { font-size:28px; font-weight:800; margin:0 0 8px; }
-.hero-sub   { font-size:14px; opacity:0.85; margin:0; line-height:1.6; }
+.hero-banner::after {
+  content: '';
+  position: absolute;
+  top: -60px; right: -60px;
+  width: 240px; height: 240px;
+  background: radial-gradient(circle, rgba(99,102,241,0.2) 0%, transparent 70%);
+  pointer-events: none;
+}
+.hero-title {
+  font-size: 24px; font-weight: 800; margin: 0 0 6px;
+  letter-spacing: -0.5px;
+}
+.hero-sub {
+  font-size: 13px; opacity: 0.65; margin: 0; line-height: 1.7;
+}
 .hero-badge {
-  display:inline-block; background:rgba(255,255,255,0.2);
-  border:1px solid rgba(255,255,255,0.3); border-radius:20px;
-  padding:3px 12px; font-size:12px; margin-bottom:12px;
+  display: inline-block;
+  background: rgba(99,102,241,0.25);
+  border: 1px solid rgba(99,102,241,0.4);
+  border-radius: 4px;
+  padding: 2px 10px; font-size: 11px;
+  margin-bottom: 10px; letter-spacing: 0.05em;
+  color: #a5b4fc;
 }
-.stTabs [data-baseweb="tab-list"] { gap:8px; border-bottom:2px solid #e2e8f0; }
+
+/* ─── タブ ─── */
+.stTabs [data-baseweb="tab-list"] {
+  gap: 2px;
+  border-bottom: 1px solid #e2e8f0;
+  background: transparent;
+}
 .stTabs [data-baseweb="tab"] {
-  border-radius:8px 8px 0 0; padding:10px 20px; font-weight:600;
-  font-size:14px; color:#64748b; background:#f1f5f9;
-  border:1px solid #e2e8f0; border-bottom:none;
+  border-radius: 6px 6px 0 0;
+  padding: 9px 18px;
+  font-weight: 600;
+  font-size: 13px;
+  color: #64748b;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-bottom: none;
+  transition: all 0.15s;
 }
-.stTabs [aria-selected="true"] { background:white !important; color:#6366f1 !important; }
+.stTabs [data-baseweb="tab"]:hover {
+  color: #4338ca;
+  background: #eef2ff;
+}
+.stTabs [aria-selected="true"] {
+  background: white !important;
+  color: #4338ca !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 -2px 0 #4338ca inset;
+}
+
+/* ─── メトリクスカード ─── */
 [data-testid="metric-container"] {
-  background:white; border:1px solid #e8eaf0; border-radius:12px;
-  padding:16px 20px; box-shadow:0 2px 8px rgba(0,0,0,0.05); transition:transform 0.2s;
+  background: white;
+  border: 1px solid #e8eaf0;
+  border-radius: 10px;
+  padding: 16px 20px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+  transition: transform 0.15s, box-shadow 0.15s;
 }
 [data-testid="metric-container"]:hover {
-  transform:translateY(-2px); box-shadow:0 4px 16px rgba(0,0,0,0.10);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
 }
-.badge { display:inline-block; padding:4px 14px; border-radius:20px; font-size:12px; font-weight:700; }
-.badge-budget   { background:#d1fae5; color:#065f46; }
-.badge-standard { background:#dbeafe; color:#1e40af; }
-.badge-premium  { background:#ede9fe; color:#5b21b6; }
-.badge-luxury   { background:#1f2937; color:#f9fafb; }
+
+/* ─── バッジ ─── */
+.badge {
+  display: inline-block;
+  padding: 3px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.badge-budget   { background: #d1fae5; color: #065f46; }
+.badge-standard { background: #dbeafe; color: #1e40af; }
+.badge-premium  { background: #ede9fe; color: #5b21b6; }
+.badge-luxury   { background: #1e293b; color: #e2e8f0; }
+
+/* ─── キーワードカード ─── */
 .kw-card {
-  background:white; border-radius:16px; padding:24px; margin-bottom:16px;
-  border:1px solid #e8eaf0; box-shadow:0 2px 12px rgba(0,0,0,0.06); transition:box-shadow 0.2s;
+  background: white;
+  border-radius: 10px;
+  padding: 22px 24px;
+  margin-bottom: 14px;
+  border: 1px solid #e8eaf0;
+  box-shadow: 0 1px 6px rgba(0,0,0,0.04);
+  transition: box-shadow 0.15s, border-color 0.15s;
 }
-.kw-card:hover { box-shadow:0 6px 24px rgba(99,102,241,0.12); border-color:#c7d2fe; }
-.kw-title  { font-size:18px; font-weight:700; color:#1e293b; margin-bottom:12px; }
-.kw-meta   { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; align-items:center; }
-.meta-chip { background:#f1f5f9; border-radius:8px; padding:4px 10px; font-size:12px; color:#475569; }
-.score-wrap  { margin:12px 0; }
-.score-label { font-size:12px; color:#64748b; margin-bottom:4px; display:flex; justify-content:space-between; }
-.score-bg    { background:#e2e8f0; border-radius:99px; height:8px; overflow:hidden; }
-.score-fill  { height:8px; border-radius:99px; }
+.kw-card:hover {
+  box-shadow: 0 4px 16px rgba(67,56,202,0.08);
+  border-color: #c7d2fe;
+}
+.kw-title  { font-size: 17px; font-weight: 700; color: #1e293b; margin-bottom: 12px; }
+.kw-meta   { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; align-items: center; }
+.meta-chip {
+  background: #f1f5f9;
+  border-radius: 4px;
+  padding: 3px 10px;
+  font-size: 12px;
+  color: #475569;
+}
+
+/* ─── スコアバー ─── */
+.score-wrap  { margin: 10px 0; }
+.score-label {
+  font-size: 12px; color: #64748b; margin-bottom: 4px;
+  display: flex; justify-content: space-between;
+}
+.score-bg   { background: #f1f5f9; border-radius: 99px; height: 7px; overflow: hidden; }
+.score-fill { height: 7px; border-radius: 99px; }
+
+/* ─── 広告文カード ─── */
 .ad-card {
-  background:#fafafe; border:1px solid #e0e7ff; border-top:3px solid #6366f1;
-  border-radius:10px; padding:14px 16px; position:relative; margin-bottom:8px;
+  background: #fafbff;
+  border: 1px solid #e8eaf0;
+  border-top: 3px solid #4338ca;
+  border-radius: 8px;
+  padding: 14px 16px;
+  position: relative;
+  margin-bottom: 8px;
 }
-.ad-num        { position:absolute; top:10px; right:12px; font-size:11px; color:#a5b4fc; font-weight:700; }
-.ad-title-text { font-size:14px; font-weight:700; color:#3730a3; margin-bottom:6px; line-height:1.4; }
-.ad-desc-text  { font-size:12px; color:#4b5563; line-height:1.6; }
-.ad-appeal     { margin-top:8px; font-size:11px; color:#6366f1; font-weight:600; }
+.ad-num        { position: absolute; top: 9px; right: 11px; font-size: 11px; color: #a5b4fc; font-weight: 700; }
+.ad-title-text { font-size: 14px; font-weight: 700; color: #312e81; margin-bottom: 6px; line-height: 1.4; }
+.ad-desc-text  { font-size: 12px; color: #4b5563; line-height: 1.65; }
+.ad-appeal     { margin-top: 8px; font-size: 11px; color: #4338ca; font-weight: 600; }
+
+/* ─── アドバイスボックス ─── */
 .advice-box {
-  background:linear-gradient(135deg,#fffbeb,#fef3c7); border:1px solid #fcd34d;
-  border-left:4px solid #f59e0b; border-radius:10px; padding:12px 16px;
-  font-size:13px; color:#78350f; margin-top:12px; line-height:1.6;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-left: 3px solid #d97706;
+  border-radius: 8px;
+  padding: 12px 16px;
+  font-size: 13px;
+  color: #78350f;
+  margin-top: 12px;
+  line-height: 1.65;
 }
 .lp-advice-box {
-  background:#f0fdf4; border:1px solid #86efac; border-left:4px solid #22c55e;
-  border-radius:10px; padding:10px 16px; font-size:13px; color:#14532d; margin:6px 0;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-left: 3px solid #16a34a;
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-size: 13px;
+  color: #14532d;
+  margin: 6px 0;
 }
+
+/* ─── インサイトカード ─── */
 .insight-card {
-  background:white; border-radius:12px; padding:16px 20px; margin-bottom:12px;
-  border:1px solid #e8eaf0; box-shadow:0 2px 8px rgba(0,0,0,0.05);
+  background: white;
+  border-radius: 10px;
+  padding: 16px 20px;
+  margin-bottom: 12px;
+  border: 1px solid #e8eaf0;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
 }
-.insight-card-title { font-size:14px; font-weight:700; color:#1e293b; margin-bottom:10px; }
+.insight-card-title {
+  font-size: 14px; font-weight: 700; color: #1e293b;
+  margin-bottom: 10px; padding-bottom: 8px;
+  border-bottom: 1px solid #f1f5f9;
+}
 .insight-item {
-  display:flex; align-items:flex-start; gap:8px;
-  padding:8px 0; border-bottom:1px solid #f1f5f9; font-size:13px; color:#334155;
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 7px 0; border-bottom: 1px solid #f8fafc;
+  font-size: 13px; color: #334155; line-height: 1.55;
 }
-.insight-item:last-child { border-bottom:none; }
-.insight-icon { font-size:16px; flex-shrink:0; margin-top:1px; }
+.insight-item:last-child { border-bottom: none; }
+.insight-icon { font-size: 14px; flex-shrink: 0; margin-top: 1px; }
+
+/* ─── 注目キーワードカード ─── */
 .top-kw-card {
-  background:#fafafe; border:1px solid #e0e7ff; border-left:4px solid #6366f1;
-  border-radius:10px; padding:14px 16px; margin-bottom:10px;
+  background: #fafbff;
+  border: 1px solid #e0e7ff;
+  border-left: 3px solid #4338ca;
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin-bottom: 10px;
 }
-.top-kw-name   { font-size:15px; font-weight:700; color:#3730a3; margin-bottom:4px; }
-.top-kw-reason { font-size:12px; color:#475569; margin-bottom:4px; }
-.top-kw-action { font-size:12px; color:#065f46; font-weight:600; }
+.top-kw-name   { font-size: 15px; font-weight: 700; color: #312e81; margin-bottom: 4px; }
+.top-kw-reason { font-size: 12px; color: #475569; margin-bottom: 4px; line-height: 1.5; }
+.top-kw-action { font-size: 12px; color: #065f46; font-weight: 600; }
+
+/* ─── 履歴カード ─── */
 .history-card {
-  background:white; border-radius:12px; padding:16px 20px; margin-bottom:10px;
-  border:1px solid #e8eaf0; box-shadow:0 2px 8px rgba(0,0,0,0.04);
-  display:flex; justify-content:space-between; align-items:center;
+  background: white;
+  border-radius: 8px;
+  padding: 14px 18px;
+  margin-bottom: 8px;
+  border: 1px solid #e8eaf0;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
-.history-date  { font-size:13px; color:#64748b; }
-.history-count { font-size:13px; font-weight:600; color:#6366f1; }
-.trend-badge-up   { background:#d1fae5; color:#065f46; padding:3px 10px; border-radius:20px; font-size:12px; font-weight:700; }
-.trend-badge-flat { background:#fef3c7; color:#92400e; padding:3px 10px; border-radius:20px; font-size:12px; font-weight:700; }
-.trend-badge-down { background:#fee2e2; color:#991b1b; padding:3px 10px; border-radius:20px; font-size:12px; font-weight:700; }
+.history-date  { font-size: 13px; color: #64748b; }
+.history-count { font-size: 13px; font-weight: 600; color: #4338ca; }
+
+/* ─── トレンドバッジ ─── */
+.trend-badge-up   { background: #d1fae5; color: #065f46; padding: 3px 10px; border-radius: 4px; font-size: 12px; font-weight: 700; }
+.trend-badge-flat { background: #fef3c7; color: #92400e; padding: 3px 10px; border-radius: 4px; font-size: 12px; font-weight: 700; }
+.trend-badge-down { background: #fee2e2; color: #991b1b; padding: 3px 10px; border-radius: 4px; font-size: 12px; font-weight: 700; }
+
+/* ─── トレンドインサイトボックス ─── */
 .trend-insight-box {
-  background:linear-gradient(135deg,#eff6ff,#dbeafe); border:1px solid #93c5fd;
-  border-left:4px solid #3b82f6; border-radius:12px; padding:16px 20px;
-  font-size:14px; color:#1e40af; margin:12px 0; line-height:1.7;
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-left: 3px solid #0284c7;
+  border-radius: 8px;
+  padding: 16px 20px;
+  font-size: 14px;
+  color: #0c4a6e;
+  margin: 12px 0;
+  line-height: 1.75;
 }
+
+/* ─── セクションタイトル ─── */
 .section-title {
-  font-size:18px; font-weight:700; color:#1e293b;
-  margin:32px 0 16px; padding-left:12px; border-left:4px solid #6366f1;
+  font-size: 16px;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 28px 0 14px;
+  padding-left: 10px;
+  border-left: 3px solid #4338ca;
 }
+
+/* ─── 空ステート ─── */
 .empty-state {
-  background:#f8fafc; border:2px dashed #c7d2fe; border-radius:16px; padding:48px; text-align:center;
+  background: #f8fafc;
+  border: 1.5px dashed #c7d2fe;
+  border-radius: 12px;
+  padding: 48px;
+  text-align: center;
 }
-.empty-state-icon  { font-size:48px; margin-bottom:12px; }
-.empty-state-title { font-size:16px; font-weight:700; color:#6366f1; margin-bottom:8px; }
-.empty-state-desc  { font-size:13px; color:#64748b; }
-[data-testid="stSidebar"] { background:#1e293b !important; }
-[data-testid="stSidebar"] * { color:#e2e8f0 !important; }
+.empty-state-icon  { font-size: 40px; margin-bottom: 12px; }
+.empty-state-title { font-size: 15px; font-weight: 700; color: #4338ca; margin-bottom: 8px; }
+.empty-state-desc  { font-size: 13px; color: #64748b; line-height: 1.6; }
+
+/* ─── サイドバー ─── */
+[data-testid="stSidebar"] { background: #0f172a !important; }
+[data-testid="stSidebar"] * { color: #cbd5e1 !important; }
 [data-testid="stSidebar"] .stTextInput input {
-  background:#334155 !important; border:1px solid #475569 !important;
-  color:#f1f5f9 !important; border-radius:8px;
+  background: #1e293b !important;
+  border: 1px solid #334155 !important;
+  color: #f1f5f9 !important;
+  border-radius: 6px;
 }
+[data-testid="stSidebar"] h1,
+[data-testid="stSidebar"] h2,
+[data-testid="stSidebar"] h3 {
+  color: #f1f5f9 !important;
+}
+
+/* ─── レスポンシブ ─── */
 @media (max-width: 768px) {
-  .hero-title { font-size:20px; }
-  .hero-banner { padding:24px 20px; }
+  .hero-title  { font-size: 19px; }
+  .hero-banner { padding: 22px 20px; }
 }
 </style>
 """, unsafe_allow_html=True)
@@ -168,18 +333,18 @@ html, body, [class*="css"] {
 # 定数
 # =====================================
 SEGMENT_INFO = {
-    "Budget":   {"badge":"badge-budget",   "emoji":"💚","label":"Budget（コスパ重視）",  "color":"#10b981","strategy":"コスパ訴求・割引訴求・最安値強調"},
-    "Standard": {"badge":"badge-standard", "emoji":"💙","label":"Standard（標準層）",    "color":"#3b82f6","strategy":"機能・信頼性・バランス訴求"},
-    "Premium":  {"badge":"badge-premium",  "emoji":"💜","label":"Premium（品質重視）",   "color":"#8b5cf6","strategy":"品質・体験・専門性訴求"},
-    "Luxury":   {"badge":"badge-luxury",   "emoji":"🖤","label":"Luxury（高級志向）",    "color":"#1f2937","strategy":"ブランド・希少性・ステータス訴求"},
+    "Budget":   {"badge":"badge-budget",   "emoji":"","label":"Budget — コスパ重視",  "color":"#10b981","strategy":"コスパ訴求・割引訴求・最安値強調"},
+    "Standard": {"badge":"badge-standard", "emoji":"","label":"Standard — 標準層",    "color":"#3b82f6","strategy":"機能・信頼性・バランス訴求"},
+    "Premium":  {"badge":"badge-premium",  "emoji":"","label":"Premium — 品質重視",   "color":"#8b5cf6","strategy":"品質・体験・専門性訴求"},
+    "Luxury":   {"badge":"badge-luxury",   "emoji":"","label":"Luxury — 高級志向",    "color":"#1f2937","strategy":"ブランド・希少性・ステータス訴求"},
 }
 INTENT_EMOJI = {
-    "比較検討段階":"🔍","購買直前":"🛒","情報収集":"📚","価格調査":"💰",
+    "比較検討段階":"","購買直前":"","情報収集":"","価格調査":"",
 }
 TREND_BADGE = {
-    "上昇":   '<span class="trend-badge-up">📈 上昇</span>',
-    "横ばい": '<span class="trend-badge-flat">➡️ 横ばい</span>',
-    "下降":   '<span class="trend-badge-down">📉 下降</span>',
+    "上昇":   '<span class="trend-badge-up">↑ 上昇</span>',
+    "横ばい": '<span class="trend-badge-flat">→ 横ばい</span>',
+    "下降":   '<span class="trend-badge-down">↓ 下降</span>',
 }
 
 # グラフ色（線・塗りつぶし）
@@ -225,7 +390,7 @@ def make_score_bar_chart(valid):
         hovertemplate="<b>%{y}</b><br>購買意欲: %{x}/10<extra></extra>",
     ))
     fig.update_layout(
-        title=dict(text="📈 購買意欲スコア比較", font=dict(size=15,color="#1e293b")),
+        title=dict(text="購買意欲スコア比較", font=dict(size=15,color="#1e293b")),
         xaxis=dict(range=[0,11],title="購買意欲スコア"),
         yaxis=dict(autorange="reversed"),
         plot_bgcolor="white", paper_bgcolor="white",
@@ -247,7 +412,7 @@ def make_segment_pie_chart(seg_counts):
         hovertemplate="<b>%{label}</b><br>%{value}件<extra></extra>",
     ))
     fig.update_layout(
-        title=dict(text="🎯 価格帯別 分布",font=dict(size=15,color="#1e293b")),
+        title=dict(text="価格帯別 分布",font=dict(size=15,color="#1e293b")),
         plot_bgcolor="white", paper_bgcolor="white",
         margin=dict(l=20,r=20,t=50,b=20), height=320,
     )
@@ -268,7 +433,7 @@ def make_intent_bar_chart(valid):
         hovertemplate="<b>%{x}</b><br>%{y}件<extra></extra>",
     ))
     fig.update_layout(
-        title=dict(text="🔍 検索意図別 件数",font=dict(size=15,color="#1e293b")),
+        title=dict(text="検索意図別 件数",font=dict(size=15,color="#1e293b")),
         plot_bgcolor="white", paper_bgcolor="white",
         margin=dict(l=20,r=20,t=50,b=30), height=300, showlegend=False,
     )
@@ -288,7 +453,7 @@ def make_history_line_chart(history, keyword):
         hovertemplate="<b>%{x}</b><br>スコア: %{y}/10<extra></extra>",
     ))
     fig.update_layout(
-        title=dict(text=f"📈 「{keyword}」の購買意欲推移",font=dict(size=14,color="#1e293b")),
+        title=dict(text=f"「{keyword}」の購買意欲推移",font=dict(size=14,color="#1e293b")),
         xaxis=dict(title="分析日時"),
         yaxis=dict(title="購買意欲スコア",range=[0,11],dtick=1),
         plot_bgcolor="white", paper_bgcolor="white",
@@ -333,7 +498,7 @@ def make_trend_line_chart(trend_data, genre):
             hovertemplate=f"<b>{kw}</b><br>%{{x}}<br>購買意欲: %{{y}}/10<extra></extra>",
         ))
     fig.update_layout(
-        title=dict(text=f"📈 【{genre}】キーワード別 購買意欲スコア推移",
+        title=dict(text=f"【{genre}】キーワード別 購買意欲スコア推移",
                    font=dict(size=15,color="#1e293b")),
         xaxis=dict(title="分析日時"),
         yaxis=dict(title="購買意欲スコア", range=[0,11], dtick=1),
@@ -363,7 +528,7 @@ def make_heatmap_chart(trend_data, genre):
         colorbar=dict(title="購買意欲"),
     ))
     fig.update_layout(
-        title=dict(text=f"🗺️ 【{genre}】購買意欲ヒートマップ（最新）",
+        title=dict(text=f"【{genre}】購買意欲ヒートマップ（最新）",
                    font=dict(size=15,color="#1e293b")),
         plot_bgcolor="white", paper_bgcolor="white",
         margin=dict(l=20,r=20,t=60,b=80), height=220,
@@ -388,7 +553,7 @@ def make_ranking_chart(trend_data, genre):
         hovertemplate="<b>%{y}</b><br>購買意欲: %{x}/10<extra></extra>",
     ))
     fig.update_layout(
-        title=dict(text=f"🏆 【{genre}】キーワードランキング",
+        title=dict(text=f"【{genre}】キーワードランキング",
                    font=dict(size=15,color="#1e293b")),
         xaxis=dict(range=[0,11],title="購買意欲スコア"),
         yaxis=dict(title=""),
@@ -415,7 +580,7 @@ def make_genre_compare_chart(genre_scores):
         hovertemplate="<b>%{x}</b><br>平均購買意欲: %{y}/10<extra></extra>",
     ))
     fig.update_layout(
-        title=dict(text="🌐 ジャンル別 平均購買意欲スコア比較",
+        title=dict(text="ジャンル別 平均購買意欲スコア比較",
                    font=dict(size=15,color="#1e293b")),
         xaxis=dict(title="ジャンル"),
         yaxis=dict(range=[0,11],title="平均購買意欲スコア"),
@@ -457,7 +622,7 @@ def render_keyword_cards(filtered: list):
             f'<div class="score-bg">'
             f'<div class="score-fill" style="width:{score*10}%;background:{info["color"]};"></div>'
             f'</div></div>'
-            f'<div style="font-size:13px;font-weight:600;color:#475569;margin:16px 0 8px;">📣 広告文案（3パターン）</div>'
+            f'<div style="font-size:13px;font-weight:600;color:#475569;margin:16px 0 8px;">広告文案（3パターン）</div>'
             f'</div>',
             unsafe_allow_html=True,
         )
@@ -467,7 +632,7 @@ def render_keyword_cards(filtered: list):
                 title_text   = ad.get("title","")
                 desc_text    = ad.get("description","")
                 appeal_point = ad.get("appeal_point","")
-                appeal_html  = f'<div class="ad-appeal">✨ {appeal_point}</div>' if appeal_point else ""
+                appeal_html  = f'<div class="ad-appeal">{appeal_point}</div>' if appeal_point else ""
                 st.markdown(
                     f'<div class="ad-card"><div class="ad-num">案{i+1}</div>'
                     f'<div class="ad-title-text">{title_text}</div>'
@@ -475,40 +640,40 @@ def render_keyword_cards(filtered: list):
                     f'{appeal_html}</div>',
                     unsafe_allow_html=True,
                 )
-                with st.expander("📋 コピー", expanded=False):
+                with st.expander("コピー", expanded=False):
                     st.code(f"【タイトル】{title_text}\n【説明文】{desc_text}", language=None)
 
         chips = ""
-        if emotion:    chips += f'<span class="meta-chip">😊 感情: {emotion}</span>'
-        if competitor: chips += f'<span class="meta-chip">⚔️ 差別化: {competitor}</span>'
-        if cta:        chips += f'<span class="meta-chip">🖱️ CTA案: {cta}</span>'
+        if emotion:    chips += f'<span class="meta-chip">感情: {emotion}</span>'
+        if competitor: chips += f'<span class="meta-chip">差別化: {competitor}</span>'
+        if cta:        chips += f'<span class="meta-chip">CTA案: {cta}</span>'
         if chips:
             st.markdown(f'<div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0;">{chips}</div>', unsafe_allow_html=True)
         if lp_advice:
-            st.markdown(f'<div class="lp-advice-box">🖥️ LP改善提案：{lp_advice}</div>', unsafe_allow_html=True)
-        st.markdown(f'<div class="advice-box">💡 アドバイス：{r.get("advice","")}</div><br>', unsafe_allow_html=True)
+            st.markdown(f'<div class="lp-advice-box">LP 改善提案：{lp_advice}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="advice-box">アドバイス：{r.get("advice","")}</div><br>', unsafe_allow_html=True)
 
 
 # =====================================
 # サイドバー
 # =====================================
 with st.sidebar:
-    st.markdown("### 🎯 AI分析ツール")
+    st.markdown("### AI キーワード分析")
     st.markdown("---")
     if not api_key:
-        st.markdown("**🔑 APIキー設定**")
+        st.markdown("**APIキー設定**")
         api_key = st.text_input("OpenAI APIキー", type="password",
             placeholder="sk-proj-...", label_visibility="collapsed")
     else:
-        st.markdown("**🔑 APIキー**")
-        st.success("設定済み ✅")
+        st.markdown("**APIキー**")
+        st.success("設定済み")
     st.markdown("---")
-    st.markdown("**📋 使い方**")
+    st.markdown("**使い方**")
     st.markdown("1. キーワード入力 or CSV アップロード\n2. 「分析開始」をクリック\n3. トレンド分析で市場推移を確認\n4. レポートをダウンロード")
     st.markdown("---")
-    st.markdown("**💡 価格帯の目安**")
+    st.markdown("**価格帯の目安**")
     for seg, info in SEGMENT_INFO.items():
-        st.markdown(f"{info['emoji']} **{seg}**  \n{info['strategy']}\n")
+        st.markdown(f"**{seg}**  \n{info['strategy']}\n")
     st.markdown("---")
     st.caption("v3.0 | Powered by OpenAI")
 
@@ -518,11 +683,11 @@ with st.sidebar:
 # =====================================
 st.markdown("""
 <div class="hero-banner">
-  <div class="hero-badge">✨ AI Powered Marketing Tool</div>
-  <div class="hero-title">🎯 AIキーワード分析ツール</div>
+  <div class="hero-badge">AI Powered Marketing Tool</div>
+  <div class="hero-title">AI キーワード分析ツール</div>
   <div class="hero-sub">
-    キーワード入力 or CSVアップロードで、トレンド・改善点・広告文案をAIが自動生成。<br>
-    Google Trendsの実データで日本市場のトレンドをひと目で把握できます。
+    キーワード入力または CSV アップロードで、トレンド・改善点・広告文案を AI が自動生成。<br>
+    Google Trends の実データで日本市場のトレンドをひと目で把握できます。
   </div>
 </div>
 """, unsafe_allow_html=True)
@@ -532,15 +697,15 @@ st.markdown("""
 # タブ定義
 # =====================================
 tab_analyze, tab_result, tab_chart, tab_trend, tab_csv, tab_summary, tab_digest, tab_history, tab_guide = st.tabs([
-    "🔍 キーワード分析",
-    "📝 分析結果",
-    "📊 グラフ分析",
-    "📈 トレンド分析",
-    "📂 CSV分析",
-    "📄 文章要約・整形",
-    "🗂️ ダイジェスト＆プレゼン",
-    "🗄️ 分析履歴",
-    "📖 使い方ガイド",
+    "キーワード分析",
+    "分析結果",
+    "グラフ分析",
+    "トレンド分析",
+    "CSV分析",
+    "文章要約・整形",
+    "ダイジェスト & プレゼン",
+    "分析履歴",
+    "使い方ガイド",
 ])
 
 
@@ -552,33 +717,33 @@ with tab_analyze:
     with col_input:
         default_kw = st.session_state.pop("csv_keywords","")
         keywords_input = st.text_area(
-            "🔑 分析したいキーワードを入力（1行に1つ・最大20件）",
+            "分析したいキーワードを入力（1行に1つ・最大20件）",
             value=default_kw, height=180,
             placeholder="格安スマホ 乗り換え おすすめ\niPhone 最新 購入\nスマホ 高級 おすすめ",
         )
     with col_btn:
         st.markdown("<br>"*3, unsafe_allow_html=True)
-        run_button = st.button("🚀 分析開始", use_container_width=True, type="primary")
+        run_button = st.button("分析開始", use_container_width=True, type="primary")
         kw_list  = [k.strip() for k in keywords_input.strip().splitlines() if k.strip()]
         st.info(f"入力数：**{len(kw_list)}件**")
-        memo     = st.text_input("📝 メモ（任意）", placeholder="例：競合調査 2024年6月")
-        industry = st.text_input("🏢 業種・ジャンル（任意）", placeholder="例：スマートフォン / 不動産")
+        memo     = st.text_input("メモ（任意）", placeholder="例：競合調査 2024年6月")
+        industry = st.text_input("業種・ジャンル（任意）", placeholder="例：スマートフォン / 不動産")
 
     if run_button:
         if not api_key:
-            st.error("⚠️ サイドバーにAPIキーを入力してください。")
+            st.error("サイドバーに API キーを入力してください。")
         elif not kw_list:
-            st.warning("⚠️ キーワードを1つ以上入力してください。")
+            st.warning("キーワードを1つ以上入力してください。")
         else:
             if len(kw_list) > 20:
-                st.warning("⚠️ 最初の20件を分析します。")
+                st.warning("最初の20件を分析します。")
                 kw_list = kw_list[:20]
             client   = get_client(api_key)
             results  = []
             progress = st.progress(0)
             status   = st.empty()
             for i, kw in enumerate(kw_list):
-                status.markdown(f"⏳ 分析中... **{kw}** ({i+1}/{len(kw_list)})")
+                status.markdown(f"分析中... **{kw}** ({i+1}/{len(kw_list)})")
                 progress.progress((i+1)/len(kw_list))
                 try:
                     data = analyze_keyword_structured(client, kw, industry=industry)
@@ -588,7 +753,7 @@ with tab_analyze:
                 time.sleep(0.5)
             progress.empty()
             session_id = save_session(results, memo=memo)
-            status.success(f"✅ {len(kw_list)}件の分析完了！（セッションID: {session_id}）")
+            status.success(f"{len(kw_list)}件の分析完了（セッションID: {session_id}）")
             st.session_state["results"] = results
 
 
@@ -598,17 +763,17 @@ with tab_analyze:
 with tab_result:
     if "results" not in st.session_state:
         show_empty_state("📝","まだ分析結果がありません",
-            "「🔍 キーワード分析」タブでキーワードを入力して分析してください。")
+            "「キーワード分析」タブでキーワードを入力して分析してください。")
     else:
         if "loaded_session_id" in st.session_state:
             sid = st.session_state.pop("loaded_session_id")
-            st.success(f"✅ セッション {sid} の分析結果を読み込みました。")
+            st.success(f"セッション {sid} の分析結果を読み込みました。")
         results = st.session_state["results"]
         valid   = [r for r in results if "error" not in r]
         if not valid:
             st.error("有効な分析結果がありません。")
         else:
-            st.markdown('<p class="section-title">📊 分析サマリー</p>', unsafe_allow_html=True)
+            st.markdown('<p class="section-title">分析サマリー</p>', unsafe_allow_html=True)
             seg_counts = {s:0 for s in SEGMENT_INFO}
             for r in valid:
                 seg = r.get("price_segment","")
@@ -617,10 +782,10 @@ with tab_result:
             c1,c2,c3,c4,c5,c6 = st.columns(6)
             c1.metric("分析件数",     f"{len(valid)}件")
             c2.metric("平均購買意欲", f"{avg_score:.1f}/10")
-            c3.metric("💚 Budget",   f"{seg_counts['Budget']}件")
-            c4.metric("💙 Standard", f"{seg_counts['Standard']}件")
-            c5.metric("💜 Premium",  f"{seg_counts['Premium']}件")
-            c6.metric("🖤 Luxury",   f"{seg_counts['Luxury']}件")
+            c3.metric("Budget",   f"{seg_counts['Budget']}件")
+            c4.metric("Standard", f"{seg_counts['Standard']}件")
+            c5.metric("Premium",  f"{seg_counts['Premium']}件")
+            c6.metric("Luxury",   f"{seg_counts['Luxury']}件")
             st.markdown("---")
             f1,f2,f3 = st.columns(3)
             with f1:
@@ -638,10 +803,10 @@ with tab_result:
             ]
             st.caption(f"表示中：{len(filtered)}件 / {len(valid)}件")
             st.markdown("---")
-            st.markdown('<p class="section-title">📝 キーワード別 詳細分析</p>', unsafe_allow_html=True)
+            st.markdown('<p class="section-title">キーワード別 詳細分析</p>', unsafe_allow_html=True)
             render_keyword_cards(filtered)
             st.markdown("---")
-            st.markdown('<p class="section-title">📋 一覧比較表</p>', unsafe_allow_html=True)
+            st.markdown('<p class="section-title">一覧比較表</p>', unsafe_allow_html=True)
             rows = []
             for r in filtered:
                 ad1 = r.get("ad_copies",[{}])[0]
@@ -657,7 +822,7 @@ with tab_result:
             df = pd.DataFrame(rows)
             st.dataframe(df, use_container_width=True, hide_index=True)
             st.markdown("---")
-            st.markdown('<p class="section-title">💾 データ保存</p>', unsafe_allow_html=True)
+            st.markdown('<p class="section-title">データ保存</p>', unsafe_allow_html=True)
             now        = datetime.datetime.now(JST).strftime("%Y%m%d_%H%M%S")
             csv_data   = df.to_csv(index=False,encoding="utf-8-sig").encode("utf-8-sig")
             json_data  = json.dumps(results,ensure_ascii=False,indent=2).encode("utf-8")
@@ -666,16 +831,16 @@ with tab_result:
             html_data  = html_report.encode("utf-8")
             dl1,dl2,dl3 = st.columns(3)
             with dl1:
-                st.download_button("📥 CSVでダウンロード",data=csv_data,
+                st.download_button("CSV でダウンロード",data=csv_data,
                     file_name=f"keyword_analysis_{now}.csv",mime="text/csv",use_container_width=True)
             with dl2:
-                st.download_button("📥 JSONでダウンロード",data=json_data,
+                st.download_button("JSON でダウンロード",data=json_data,
                     file_name=f"keyword_analysis_{now}.json",mime="application/json",use_container_width=True)
             with dl3:
-                st.download_button("📄 HTMLレポートをダウンロード",data=html_data,
+                st.download_button("HTML レポートをダウンロード",data=html_data,
                     file_name=f"report_{now}.html",mime="text/html",use_container_width=True)
             st.markdown("---")
-            st.markdown('<p class="section-title">👁️ レポートプレビュー</p>', unsafe_allow_html=True)
+            st.markdown('<p class="section-title">レポートプレビュー</p>', unsafe_allow_html=True)
             st.caption("ダウンロードしたHTMLをブラウザで開いて Ctrl+P → 「PDFとして保存」でPDF化できます。")
             with st.expander("レポートのプレビューを表示", expanded=False):
                 st.components.v1.html(html_report, height=600, scrolling=True)
@@ -687,7 +852,7 @@ with tab_result:
 with tab_chart:
     if "results" not in st.session_state:
         show_empty_state("📊","まだ分析結果がありません",
-            "「🔍 キーワード分析」タブでキーワードを入力して分析してください。")
+            "「キーワード分析」タブでキーワードを入力して分析してください。")
     else:
         results = st.session_state["results"]
         valid   = [r for r in results if "error" not in r]
@@ -698,20 +863,20 @@ with tab_chart:
             for r in valid:
                 seg = r.get("price_segment","")
                 if seg in seg_counts: seg_counts[seg]+=1
-            st.markdown('<p class="section-title">📊 グラフ分析</p>', unsafe_allow_html=True)
+            st.markdown('<p class="section-title">グラフ分析</p>', unsafe_allow_html=True)
             st.plotly_chart(make_score_bar_chart(valid), use_container_width=True)
             st.markdown("---")
             g1,g2 = st.columns(2)
             with g1: st.plotly_chart(make_segment_pie_chart(seg_counts), use_container_width=True)
             with g2: st.plotly_chart(make_intent_bar_chart(valid), use_container_width=True)
             st.markdown("---")
-            st.markdown('<p class="section-title">💡 グラフの読み方</p>', unsafe_allow_html=True)
+            st.markdown('<p class="section-title">グラフの読み方</p>', unsafe_allow_html=True)
             st.markdown("""
 | グラフ | 見るべきポイント |
 |--------|----------------|
-| 📈 購買意欲スコア | 8点以上は入札単価を上げる価値あり |
-| 🎯 価格帯別分布 | 多い層の広告文を優先的に強化する |
-| 🔍 検索意図別件数 | 「購買直前」が多ければ直接訴求が有効 |
+| 購買意欲スコア | 8点以上は入札単価を上げる価値あり |
+| 価格帯別分布 | 多い層の広告文を優先的に強化する |
+| 検索意図別件数 | 「購買直前」が多ければ直接訴求が有効 |
 """)
 
 
@@ -719,14 +884,14 @@ with tab_chart:
 # タブ④：トレンド分析（Google Trends 実データ）v3.1
 # =====================================
 with tab_trend:
-    st.markdown('<p class="section-title">📈 日本市場 トレンド分析</p>', unsafe_allow_html=True)
-    st.caption("Google Trendsの実データを使って、日本市場における検索ボリュームの推移をリアルタイムで分析します。")
+    st.markdown('<p class="section-title">日本市場 トレンド分析</p>', unsafe_allow_html=True)
+    st.caption("Google Trends の実データを使って、日本市場における検索ボリュームの推移をリアルタイムで分析します。")
 
     # ====================================================
     # ① トレンド予測（独立セクション・常時表示）
     # ====================================================
-    with st.expander("📈 トレンド予測（キーワードを入力してすぐ使えます）", expanded=True):
-        st.caption("キーワードを入力するだけで、Google Trendsのデータから将来の検索トレンドを予測します。トレンド分析の実行は不要です。")
+    with st.expander("トレンド予測（キーワードを入力してすぐ使えます）", expanded=True):
+        st.caption("キーワードを入力するだけで、Google Trends のデータから将来の検索トレンドを予測します。トレンド分析の実行は不要です。")
         col_p1, col_p2 = st.columns([3, 1])
         with col_p1:
             pred_keyword = st.text_input(
@@ -739,9 +904,9 @@ with tab_trend:
                 "予測週数", min_value=4, max_value=52, value=12, step=4, key="pred_weeks"
             )
 
-        if st.button("📊 予測を実行", key="btn_predict"):
+        if st.button("予測を実行", key="btn_predict"):
             if not pred_keyword:
-                st.warning("⚠️ キーワードを入力してください。")
+                st.warning("キーワードを入力してください。")
             else:
                 with st.spinner("Google Trends からデータ取得 & 予測中..."):
                     try:
@@ -775,7 +940,7 @@ with tab_trend:
                             upper_p      = np.clip(future_yp + 1.96 * std_p, 0, 100).tolist()
                             lower_p      = np.clip(future_yp - 1.96 * std_p, 0, 100).tolist()
 
-                            trend_label_p = "📈 上昇傾向" if slope_p > 0.3 else ("📉 下降傾向" if slope_p < -0.3 else "➡️ 横ばい")
+                            trend_label_p = "↑ 上昇傾向" if slope_p > 0.3 else ("↓ 下降傾向" if slope_p < -0.3 else "→ 横ばい")
 
                             st.session_state["pred_result"] = {
                                 "keyword": pred_keyword,
@@ -832,14 +997,14 @@ with tab_trend:
     col_kws, col_opts = st.columns([2,1])
     with col_kws:
         trend_keywords_input = st.text_area(
-            "🔑 調べたいキーワードを入力（1行に1つ・最大5件）",
+            "調べたいキーワードを入力（1行に1つ・最大5件）",
             height=140,
             placeholder="格安スマホ\niPhone\nSIMフリー\nスマホ 乗り換え\nアンドロイド",
             help="Google Trendsは1回のリクエストで最大5キーワードまで比較できます",
         )
     with col_opts:
         timeframe_option = st.selectbox(
-            "📅 期間を選択",
+            "期間を選択",
             options=[
                 ("直近1ヶ月",  "today 1-m"),
                 ("直近3ヶ月",  "today 3-m"),
@@ -850,19 +1015,19 @@ with tab_trend:
             index=1,
         )
         st.markdown("<br>", unsafe_allow_html=True)
-        trend_run = st.button("🔍 市場トレンドを取得", type="primary", use_container_width=True)
+        trend_run = st.button("市場トレンドを取得", type="primary", use_container_width=True)
         st.caption("※ Google Trendsへのアクセスのため\n取得に10〜20秒かかります")
 
     trend_kw_list = [k.strip() for k in trend_keywords_input.strip().splitlines() if k.strip()]
 
     if trend_run:
         if not trend_kw_list:
-            st.warning("⚠️ キーワードを1つ以上入力してください。")
+            st.warning("キーワードを1つ以上入力してください。")
         else:
             if len(trend_kw_list) > 5:
-                st.warning("⚠️ 最初の5件を取得します。")
+                st.warning("最初の5件を取得します。")
                 trend_kw_list = trend_kw_list[:5]
-            with st.spinner("📡 Google Trendsから日本市場データを取得中...（10〜20秒かかります）"):
+            with st.spinner("Google Trends から日本市場データを取得中...（10〜20秒かかります）"):
                 try:
                     from market_trend import fetch_market_trends
                     market_data = fetch_market_trends(
@@ -871,7 +1036,7 @@ with tab_trend:
                     )
                     st.session_state["market_data"]     = market_data
                     st.session_state["market_keywords"] = trend_kw_list
-                    st.success(f"✅ データ取得完了！（取得日時: {market_data['fetched_at']}）")
+                    st.success(f"データ取得完了（取得日時: {market_data['fetched_at']}）")
                 except Exception as e:
                     st.error(f"データ取得中にエラーが発生しました: {e}")
                     st.info("Google Trendsへのアクセスが一時的に制限されている場合があります。1〜2分後に再試行してください。")
@@ -887,14 +1052,14 @@ with tab_trend:
         summaries   = market_data.get("summaries",[])
 
         # ---- サマリーカード ----
-        st.markdown('<p class="section-title">📊 キーワード別サマリー</p>', unsafe_allow_html=True)
+        st.markdown('<p class="section-title">キーワード別サマリー</p>', unsafe_allow_html=True)
         # Google Trends取得時のエラーを表示
         if market_data.get("error_trends"):
-            st.error(f"⚠️ トレンドデータ取得エラー: {market_data['error_trends']}")
+            st.error(f"トレンドデータ取得エラー: {market_data['error_trends']}")
 
         if summaries:
             cols = st.columns(len(summaries))
-            trend_icons  = {"上昇":"📈","横ばい":"➡️","下降":"📉"}
+            trend_icons  = {"上昇":"↑","横ばい":"→","下降":"↓"}
             trend_colors = {"上昇":"#10b981","横ばい":"#f59e0b","下降":"#ef4444"}
             for i, s in enumerate(summaries):
                 trend      = s.get("trend","")
@@ -922,7 +1087,7 @@ with tab_trend:
 
         # ---- 時系列グラフ ----
         if not trend_df.empty:
-            st.markdown('<p class="section-title">📈 検索ボリューム推移（Google Trends）</p>', unsafe_allow_html=True)
+            st.markdown('<p class="section-title">検索ボリューム推移（Google Trends）</p>', unsafe_allow_html=True)
             fig = go.Figure()
             for i, kw in enumerate(kws):
                 if kw in trend_df.columns:
@@ -939,7 +1104,7 @@ with tab_trend:
                     ))
             fig.update_layout(
                 title=dict(
-                    text="🇯🇵 日本市場 検索ボリューム推移（Google Trends・数値は相対的な人気度 0〜100）",
+                    text="日本市場 検索ボリューム推移（Google Trends・数値は相対的な人気度 0〜100）",
                     font=dict(size=14,color="#1e293b"),
                 ),
                 xaxis=dict(title="日付",showgrid=True,gridcolor="#f1f5f9"),
@@ -957,7 +1122,7 @@ with tab_trend:
         # ---- 地域別グラフ ----
         region_df = market_data.get("region_df", pd.DataFrame())
         if not region_df.empty:
-            st.markdown('<p class="section-title">🗾 都道府県別 検索人気度</p>', unsafe_allow_html=True)
+            st.markdown('<p class="section-title">都道府県別 検索人気度</p>', unsafe_allow_html=True)
             first_kw = kws[0] if kws else ""
             if first_kw and first_kw in region_df.columns:
                 top_regions = region_df[first_kw].sort_values(ascending=False).head(15)
@@ -970,7 +1135,7 @@ with tab_trend:
                         hovertemplate="<b>%{y}</b><br>人気度: %{x}<extra></extra>",
                     ))
                     fig_region.update_layout(
-                        title=dict(text=f"🗾 「{first_kw}」の都道府県別 検索人気度 TOP15",
+                        title=dict(text=f"「{first_kw}」の都道府県別 検索人気度 TOP15",
                                    font=dict(size=13,color="#1e293b")),
                         xaxis=dict(range=[0,115],title="人気度"),
                         yaxis=dict(autorange="reversed"),
@@ -981,10 +1146,10 @@ with tab_trend:
                     fig_region.update_xaxes(showgrid=True,gridcolor="#f1f5f9")
                     st.plotly_chart(fig_region, use_container_width=True)
                 with rg2:
-                    st.markdown('<div class="insight-card"><div class="insight-card-title">🗾 地域別 インサイト</div>', unsafe_allow_html=True)
+                    st.markdown('<div class="insight-card"><div class="insight-card-title">地域別 インサイト</div>', unsafe_allow_html=True)
                     for region, val in top_regions.head(3).items():
                         st.markdown(
-                            f'<div class="insight-item"><span class="insight-icon">📍</span>'
+                            f'<div class="insight-item"><span class="insight-icon">·</span>'
                             f'<div><b>{region}</b>: 人気度 {val}</div></div>',
                             unsafe_allow_html=True,
                         )
@@ -995,14 +1160,14 @@ with tab_trend:
         # ---- 関連キーワード ----
         related_queries = market_data.get("related_queries",{})
         if related_queries:
-            st.markdown('<p class="section-title">🔗 関連キーワード（Google Trends）</p>', unsafe_allow_html=True)
+            st.markdown('<p class="section-title">関連キーワード（Google Trends）</p>', unsafe_allow_html=True)
             st.caption("実際にこのキーワードと一緒に検索されているワードです。広告キーワードの拡張に活用できます。")
             rq_cols = st.columns(min(len(related_queries),3))
             for i, (kw, queries) in enumerate(related_queries.items()):
                 with rq_cols[i % 3]:
                     st.markdown(
                         f'<div class="insight-card">'
-                        f'<div class="insight-card-title">🔍 「{kw}」の関連キーワード</div>',
+                        f'<div class="insight-card-title">「{kw}」の関連キーワード</div>',
                         unsafe_allow_html=True,
                     )
                     if queries:
@@ -1022,18 +1187,18 @@ with tab_trend:
         # ---- 最新ニュース ----
         news_data = market_data.get("news",{})
         if news_data:
-            st.markdown('<p class="section-title">📰 最新ニュース（Google News）</p>', unsafe_allow_html=True)
+            st.markdown('<p class="section-title">最新ニュース（Google News）</p>', unsafe_allow_html=True)
             st.caption("このキーワードに関する日本の最新ニュースです。市場の動きを把握するのに役立ちます。")
             for kw, news_list in news_data.items():
                 if not news_list:
                     continue
-                st.markdown(f"**🔍 「{kw}」のニュース**")
+                st.markdown(f"**「{kw}」のニュース**")
                 for news in news_list:
                     title   = news.get("title","")
                     link    = news.get("link","")
                     pubdate = news.get("pubDate","")
                     st.markdown(
-                        f'<div class="insight-item"><span class="insight-icon">📰</span>'
+                        f'<div class="insight-item"><span class="insight-icon">·</span>'
                         f'<div>'
                         f'<a href="{link}" target="_blank" style="color:#3730a3;font-weight:600;text-decoration:none;">{title}</a>'
                         f'<div style="font-size:11px;color:#94a3b8;margin-top:2px;">{pubdate}</div>'
@@ -1044,12 +1209,12 @@ with tab_trend:
             st.markdown("---")
 
         # ---- AIによる市場分析 ----
-        st.markdown('<p class="section-title">🤖 AIによる市場トレンド分析</p>', unsafe_allow_html=True)
-        st.caption("取得したGoogle Trendsデータをもとに、AIが市場動向と広告戦略を分析します。")
+        st.markdown('<p class="section-title">AI による市場トレンド分析</p>', unsafe_allow_html=True)
+        st.caption("取得した Google Trends データをもとに、AI が市場動向と広告戦略を分析します。")
         if not api_key:
-            st.warning("⚠️ サイドバーにAPIキーを入力すると、AIによる分析ができます。")
+            st.warning("サイドバーに API キーを入力すると、AI による分析ができます。")
         else:
-            if st.button("🤖 AIで市場トレンドを分析する", type="primary"):
+            if st.button("AI で市場トレンドを分析する", type="primary"):
                 with st.spinner("AIが市場データを分析中..."):
                     try:
                         summary_text = "\n".join([
@@ -1093,7 +1258,7 @@ with tab_trend:
                 comment_html = st.session_state["market_ai_comment"].replace("\n","<br>")
                 st.markdown(
                     f'<div class="trend-insight-box">'
-                    f'🤖 AI市場分析：<br><br>{comment_html}'
+                    f'AI 市場分析：<br><br>{comment_html}'
                     f'</div>',
                     unsafe_allow_html=True,
                 )
@@ -1103,7 +1268,7 @@ with tab_trend:
         # ② ヒートマップ（トレンド分析後に自動表示）
         # ====================================================
         st.markdown("---")
-        st.markdown('<p class="section-title">🟥 曜日×時間帯 ヒートマップ</p>', unsafe_allow_html=True)
+        st.markdown('<p class="section-title">曜日 × 時間帯 ヒートマップ</p>', unsafe_allow_html=True)
         st.caption("トレンド分析で取得したキーワードの検索アクティビティを曜日×時間帯で自動表示します。広告配信の最適時間帯発見に活用できます。")
 
         heat_kw_target = kws[0] if kws else ""
@@ -1153,7 +1318,7 @@ with tab_trend:
 
                 matrix_np_h = np.array(matrix_h)
                 peak_idx_h  = int(np.argmax(matrix_np_h))
-                st.info(f"📌 最も検索が活発な時間帯：**{days_h[peak_idx_h // 24]}曜日 {peak_idx_h % 24:02d}:00〜{peak_idx_h % 24 + 1:02d}:00**")
+                st.info(f"最も検索が活発な時間帯：**{days_h[peak_idx_h // 24]}曜日 {peak_idx_h % 24:02d}:00〜{peak_idx_h % 24 + 1:02d}:00**")
 
             except Exception as e:
                 st.error(f"ヒートマップ生成中にエラーが発生しました: {e}")
@@ -1162,7 +1327,7 @@ with tab_trend:
         # ③ 年代別分析（折りたたみ表示・ボタン実行）
         # ====================================================
         st.markdown("---")
-        with st.expander("👥 年代別 AI分析（クリックして展開）", expanded=False):
+        with st.expander("年代別 AI 分析（クリックして展開）", expanded=False):
             st.caption("OpenAI API が各年代の関心度・購買意向・効果的な訴求チャネルを分析します。分析するキーワードはトレンド分析で取得した1件目が自動入力されます。")
 
             DEFAULT_RANGES = [(10,19),(20,29),(30,39),(40,49),(50,59),(60,79)]
@@ -1193,11 +1358,11 @@ with tab_trend:
                 age_groups = [{"label": DEFAULT_LABELS[i], "min": DEFAULT_RANGES[i][0], "max": DEFAULT_RANGES[i][1]} for i in range(len(DEFAULT_LABELS))]
                 st.markdown("**デフォルト設定：** " + "　".join(DEFAULT_LABELS))
 
-            if st.button("🧠 年代別AI分析を実行", key="btn_age"):
+            if st.button("年代別 AI 分析を実行", key="btn_age"):
                 if not age_keyword:
-                    st.warning("⚠️ キーワードを入力してください。")
+                    st.warning("キーワードを入力してください。")
                 elif not api_key:
-                    st.error("⚠️ サイドバーにAPIキーを入力してください。")
+                    st.error("サイドバーに API キーを入力してください。")
                 else:
                     with st.spinner("AIが各年代を分析中...（10〜20秒ほどかかります）"):
                         try:
@@ -1280,15 +1445,15 @@ JSON以外のテキストは一切出力しないでください。
                             st.progress(min(int(grp.get("interest",0)),100)/100, text=f"関心度: {grp.get('interest',0)}")
                             st.progress(min(int(grp.get("purchase_rate",0)),100)/100, text=f"購買意向: {grp.get('purchase_rate',0)}")
                             with st.expander("詳細を見る"):
-                                st.markdown("**✅ 訴求ポイント**")
+                                st.markdown("**訴求ポイント**")
                                 for p in grp.get("appeal_points",[]): st.markdown(f"- {p}")
-                                st.markdown("**⚠️ リスク**")
+                                st.markdown("**リスク**")
                                 for r_item in grp.get("risks",[]): st.markdown(f"- {r_item}")
-                                st.markdown("**📡 効果的チャネル**")
+                                st.markdown("**効果的チャネル**")
                                 for ch in grp.get("channels",[]): st.markdown(f"- {ch}")
-                                st.markdown(f"**📝 概要**  \n{grp.get('summary','')}")
+                                st.markdown(f"**概要**  \n{grp.get('summary','')}")
 
-                    st.markdown("#### 💡 総合インサイト")
+                    st.markdown("#### 総合インサイト")
                     st.info(result_age.get("overall_insight", ""))
 
 
@@ -1296,10 +1461,10 @@ JSON以外のテキストは一切出力しないでください。
 # タブ⑤：CSV分析
 # =====================================
 with tab_csv:
-    st.markdown('<p class="section-title">📂 CSVアップロード＆AI分析</p>', unsafe_allow_html=True)
-    st.caption("Google Ads・SEOツール・Excelなど、どんな形式のCSVでも自動で読み込んでAIが分析します。")
-    uploaded = st.file_uploader("CSVファイルをアップロード", type=["csv"],
-        help="UTF-8またはShift-JIS（Excel保存のCSV）に対応しています。")
+    st.markdown('<p class="section-title">CSV アップロード & AI 分析</p>', unsafe_allow_html=True)
+    st.caption("Google Ads・SEO ツール・Excel など、どんな形式の CSV でも自動で読み込んで AI が分析します。")
+    uploaded = st.file_uploader("CSV ファイルをアップロード", type=["csv"],
+        help="UTF-8 または Shift-JIS（Excel 保存の CSV）に対応しています。")
 
     if uploaded is None:
         show_empty_state("📂","CSVファイルをアップロードしてください",
@@ -1315,14 +1480,14 @@ with tab_csv:
             col_map = detect_columns(df_raw)
             df_prep = prepare_dataframe(df_raw, col_map)
 
-            st.markdown('<p class="section-title">📋 読み込んだデータ</p>', unsafe_allow_html=True)
+            st.markdown('<p class="section-title">読み込んだデータ</p>', unsafe_allow_html=True)
             m1,m2,m3 = st.columns(3)
             m1.metric("総行数",   f"{len(df_raw)}行")
             m2.metric("総列数",   f"{len(df_raw.columns)}列")
             m3.metric("検出指標", f"{len(col_map)}項目")
 
             if col_map:
-                chip_html = "".join(f'<span class="meta-chip">✅ {k} → {v}</span>' for k,v in col_map.items())
+                chip_html = "".join(f'<span class="meta-chip">{k} → {v}</span>' for k,v in col_map.items())
                 st.markdown(f'<div style="display:flex;flex-wrap:wrap;gap:6px;margin:8px 0;">{chip_html}</div>', unsafe_allow_html=True)
             else:
                 st.warning("標準的なマーケティング指標の列が検出できませんでした。")
@@ -1331,7 +1496,7 @@ with tab_csv:
                 st.dataframe(df_raw.head(10), use_container_width=True, hide_index=True)
 
             st.markdown("---")
-            st.markdown('<p class="section-title">📊 データの可視化</p>', unsafe_allow_html=True)
+            st.markdown('<p class="section-title">データの可視化</p>', unsafe_allow_html=True)
             chart_pairs = [
                 ("ctr",   "CTR上位キーワード",       "#6366f1"),
                 ("clicks","クリック数ランキング",     "#3b82f6"),
@@ -1350,7 +1515,7 @@ with tab_csv:
                         col = gc1 if shown % 2 == 0 else gc2
                         with col:
                             st.plotly_chart(
-                                make_csv_bar_chart(top_df, col_map["keyword"], col_map[metric], f"📊 {title}", color),
+                                make_csv_bar_chart(top_df, col_map["keyword"], col_map[metric], title, color),
                                 use_container_width=True,
                             )
                         shown += 1
@@ -1358,14 +1523,14 @@ with tab_csv:
                 st.info("グラフを表示するにはキーワード列と数値列が必要です。")
 
             st.markdown("---")
-            st.markdown('<p class="section-title">🤖 AIによるトレンド・改善点の自動抽出</p>', unsafe_allow_html=True)
-            csv_industry = st.text_input("🏢 業種・ジャンル（任意）", placeholder="例：ECサイト / 不動産", key="csv_industry")
-            csv_question = st.text_input("💬 特に知りたいこと（任意）", placeholder="例：CVRが低いキーワードの原因を知りたい", key="csv_question")
+            st.markdown('<p class="section-title">AI によるトレンド・改善点の自動抽出</p>', unsafe_allow_html=True)
+            csv_industry = st.text_input("業種・ジャンル（任意）", placeholder="例：ECサイト / 不動産", key="csv_industry")
+            csv_question = st.text_input("特に知りたいこと（任意）", placeholder="例：CVRが低いキーワードの原因を知りたい", key="csv_question")
 
             if not api_key:
-                st.warning("⚠️ サイドバーにAPIキーを入力すると、AIによる分析ができます。")
+                st.warning("サイドバーに API キーを入力すると、AI による分析ができます。")
             else:
-                if st.button("🤖 AIで分析する", type="primary"):
+                if st.button("AI で分析する", type="primary"):
                     with st.spinner("AIがCSVを分析中です..."):
                         try:
                             client    = get_client(api_key)
@@ -1378,55 +1543,55 @@ with tab_csv:
             if "csv_ai_result" in st.session_state:
                 ai = st.session_state["csv_ai_result"]
                 if ai.get("summary"):
-                    st.markdown(f'<div class="advice-box" style="margin-top:8px;">📋 総評：{ai["summary"]}</div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="advice-box" style="margin-top:8px;">総評：{ai["summary"]}</div>', unsafe_allow_html=True)
                 st.markdown("---")
                 r1,r2 = st.columns(2)
                 with r1:
-                    st.markdown('<div class="insight-card"><div class="insight-card-title">📈 トレンド・傾向</div>', unsafe_allow_html=True)
-                    for item in ai.get("trends",[]): st.markdown(f'<div class="insight-item"><span class="insight-icon">📌</span>{item}</div>', unsafe_allow_html=True)
+                    st.markdown('<div class="insight-card"><div class="insight-card-title">トレンド・傾向</div>', unsafe_allow_html=True)
+                    for item in ai.get("trends",[]): st.markdown(f'<div class="insight-item"><span class="insight-icon">·</span>{item}</div>', unsafe_allow_html=True)
                     st.markdown('</div>', unsafe_allow_html=True)
                 with r2:
-                    st.markdown('<div class="insight-card"><div class="insight-card-title">⚠️ 課題・問題点</div>', unsafe_allow_html=True)
-                    for item in ai.get("issues",[]): st.markdown(f'<div class="insight-item"><span class="insight-icon">🔴</span>{item}</div>', unsafe_allow_html=True)
+                    st.markdown('<div class="insight-card"><div class="insight-card-title">課題・問題点</div>', unsafe_allow_html=True)
+                    for item in ai.get("issues",[]): st.markdown(f'<div class="insight-item"><span class="insight-icon">·</span>{item}</div>', unsafe_allow_html=True)
                     st.markdown('</div>', unsafe_allow_html=True)
-                st.markdown('<div class="insight-card"><div class="insight-card-title">💡 改善提案</div>', unsafe_allow_html=True)
-                for item in ai.get("improvements",[]): st.markdown(f'<div class="insight-item"><span class="insight-icon">✅</span>{item}</div>', unsafe_allow_html=True)
+                st.markdown('<div class="insight-card"><div class="insight-card-title">改善提案</div>', unsafe_allow_html=True)
+                for item in ai.get("improvements",[]): st.markdown(f'<div class="insight-item"><span class="insight-icon">·</span>{item}</div>', unsafe_allow_html=True)
                 st.markdown('</div>', unsafe_allow_html=True)
                 r3,r4 = st.columns(2)
                 medals = ["🥇","🥈","🥉"]
                 with r3:
-                    st.markdown('<div class="insight-card"><div class="insight-card-title">🎯 ターゲティング最適化</div>', unsafe_allow_html=True)
-                    for item in ai.get("targeting",[]): st.markdown(f'<div class="insight-item"><span class="insight-icon">🎯</span>{item}</div>', unsafe_allow_html=True)
+                    st.markdown('<div class="insight-card"><div class="insight-card-title">ターゲティング最適化</div>', unsafe_allow_html=True)
+                    for item in ai.get("targeting",[]): st.markdown(f'<div class="insight-item"><span class="insight-icon">·</span>{item}</div>', unsafe_allow_html=True)
                     st.markdown('</div>', unsafe_allow_html=True)
                 with r4:
-                    st.markdown('<div class="insight-card"><div class="insight-card-title">🚀 今すぐやるべきアクション</div>', unsafe_allow_html=True)
+                    st.markdown('<div class="insight-card"><div class="insight-card-title">今すぐやるべきアクション</div>', unsafe_allow_html=True)
                     for i,item in enumerate(ai.get("next_actions",[])):
                         icon = medals[i] if i < 3 else "▶️"
                         st.markdown(f'<div class="insight-item"><span class="insight-icon">{icon}</span>{item}</div>', unsafe_allow_html=True)
                     st.markdown('</div>', unsafe_allow_html=True)
                 if ai.get("top_keywords"):
-                    st.markdown('<p class="section-title">⭐ 注目キーワード</p>', unsafe_allow_html=True)
+                    st.markdown('<p class="section-title">注目キーワード</p>', unsafe_allow_html=True)
                     kw_cols = st.columns(min(len(ai["top_keywords"]),3))
                     for i,kw in enumerate(ai["top_keywords"]):
                         with kw_cols[i%3]:
                             st.markdown(
                                 f'<div class="top-kw-card">'
-                                f'<div class="top-kw-name">🔍 {kw.get("keyword","")}</div>'
+                                f'<div class="top-kw-name">{kw.get("keyword","")}</div>'
                                 f'<div class="top-kw-reason">{kw.get("reason","")}</div>'
                                 f'<div class="top-kw-action">→ {kw.get("action","")}</div>'
                                 f'</div>', unsafe_allow_html=True)
                 if "keyword" in col_map:
                     st.markdown("---")
-                    st.markdown('<p class="section-title">🔗 キーワード分析へ連携</p>', unsafe_allow_html=True)
+                    st.markdown('<p class="section-title">キーワード分析へ連携</p>', unsafe_allow_html=True)
                     kw_list_csv = df_raw[col_map["keyword"]].dropna().astype(str).str.strip().unique().tolist()
                     selected_kws = st.multiselect("分析するキーワードを選択（最大20件）",
                         options=kw_list_csv[:50], default=kw_list_csv[:5])
-                    if st.button("📤 選択したキーワードを分析タブへ送る"):
+                    if st.button("選択したキーワードをキーワード分析タブへ送る"):
                         st.session_state["csv_keywords"] = "\n".join(selected_kws[:20])
-                        st.success("✅ 「🔍 キーワード分析」タブを開いてキーワード欄を確認してください。")
+                        st.success("「キーワード分析」タブを開いてキーワード欄を確認してください。")
                 st.markdown("---")
                 ai_json = json.dumps(ai,ensure_ascii=False,indent=2).encode("utf-8")
-                st.download_button("📥 AI分析結果をJSONでダウンロード",data=ai_json,
+                st.download_button("AI 分析結果を JSON でダウンロード",data=ai_json,
                     file_name=f"csv_analysis_{datetime.datetime.now(JST).strftime('%Y%m%d_%H%M%S')}.json",
                     mime="application/json")
 
@@ -1443,23 +1608,23 @@ with tab_csv:
 # タブ⑥：文章要約・整形
 # =====================================
 with tab_summary:
-    st.markdown('<p class="section-title">📄 文章要約・整形</p>', unsafe_allow_html=True)
-    st.caption("社内資料・報告書などの文章をAIが読みやすく要約・整形します。テキスト入力またはPDF/Wordファイルのアップロードに対応しています。")
+    st.markdown('<p class="section-title">文章要約・整形</p>', unsafe_allow_html=True)
+    st.caption("社内資料・報告書などの文章を AI が読みやすく要約・整形します。テキスト入力または PDF / Word ファイルのアップロードに対応しています。")
 
     if not api_key:
-        st.warning("⚠️ サイドバーにAPIキーを入力してください。")
+        st.warning("サイドバーに API キーを入力してください。")
 
     # ── 入力方法の選択 ──
     input_method = st.radio(
         "入力方法を選択",
-        ["📝 テキストを直接入力", "📎 ファイルをアップロード（PDF / Word）"],
+        ["テキストを直接入力", "ファイルをアップロード（PDF / Word）"],
         horizontal=True,
         key="summary_input_method",
     )
 
     raw_text = ""
 
-    if input_method == "📝 テキストを直接入力":
+    if input_method == "テキストを直接入力":
         raw_text = st.text_area(
             "要約・整形したい文章を貼り付けてください",
             height=240,
@@ -1505,7 +1670,7 @@ with tab_summary:
                             st.error("Wordファイルの読み込みに python-docx が必要です。requirements.txt に python-docx を追加してください。")
 
                     if raw_text:
-                        st.success(f"✅ ファイル読み込み完了（{len(raw_text)}文字）")
+                        st.success(f"ファイル読み込み完了（{len(raw_text)}文字）")
                         with st.expander("読み込んだテキストを確認", expanded=False):
                             st.text(raw_text[:2000] + ("..." if len(raw_text) > 2000 else ""))
                     else:
@@ -1517,7 +1682,7 @@ with tab_summary:
     st.markdown("---")
 
     # ── 要約設定 ──
-    st.markdown("#### ⚙️ 要約設定")
+    st.markdown("#### 要約設定")
     col_s1, col_s2 = st.columns(2)
 
     with col_s1:
@@ -1554,19 +1719,19 @@ with tab_summary:
     }
 
     # ── 実行ボタン ──
-    run_summary = st.button("✨ 要約・整形を実行", type="primary", key="btn_summary")
+    run_summary = st.button("要約・整形を実行", type="primary", key="btn_summary")
 
     if run_summary:
         if not api_key:
-            st.error("⚠️ サイドバーにAPIキーを入力してください。")
+            st.error("サイドバーに API キーを入力してください。")
         elif not raw_text.strip():
-            st.warning("⚠️ 文章を入力またはファイルをアップロードしてください。")
+            st.warning("文章を入力またはファイルをアップロードしてください。")
         else:
             # 文字数が多すぎる場合は先頭8000文字に制限
             text_to_summarize = raw_text.strip()
             if len(text_to_summarize) > 8000:
                 text_to_summarize = text_to_summarize[:8000]
-                st.info("📌 文章が長いため、先頭8000文字を対象に要約します。")
+                st.info("文章が長いため、先頭8000文字を対象に要約します。")
 
             length_str = length_map[summary_length]
             max_tok    = length_tokens_map[summary_length]
@@ -1631,14 +1796,14 @@ with tab_summary:
     # ── 結果表示 ──
     if "summary_result" in st.session_state:
         st.markdown("---")
-        st.markdown("#### 📋 要約・整形結果")
+        st.markdown("#### 要約・整形結果")
 
         style_used  = st.session_state.get("summary_style_used", "")
         length_used = st.session_state.get("summary_length_used", "")
 
         col_badge1, col_badge2 = st.columns([1, 3])
         with col_badge1:
-            st.markdown(f'<span class="meta-chip">📌 {style_used}</span>', unsafe_allow_html=True)
+            st.markdown(f'<span class="meta-chip">{style_used}</span>', unsafe_allow_html=True)
         with col_badge2:
             st.markdown(f'<span class="meta-chip">📏 {length_used}</span>', unsafe_allow_html=True)
 
@@ -1655,13 +1820,13 @@ with tab_summary:
         )
 
         # ── ダウンロードボタン ──
-        st.markdown("#### 💾 結果をダウンロード")
+        st.markdown("#### 結果をダウンロード")
         now_str = datetime.datetime.now(JST).strftime("%Y%m%d_%H%M%S")
 
         dl_col1, dl_col2 = st.columns(2)
         with dl_col1:
             st.download_button(
-                "📥 TXTでダウンロード",
+                "TXT でダウンロード",
                 data=result_text.encode("utf-8"),
                 file_name=f"summary_{now_str}.txt",
                 mime="text/plain",
@@ -1682,13 +1847,13 @@ with tab_summary:
 </style>
 </head>
 <body>
-<h1>📄 要約・整形結果</h1>
+<h1>要約・整形結果</h1>
 <div class="meta">スタイル: {style_used}　|　長さ: {length_used}　|　作成日時: {datetime.datetime.now(JST).strftime("%Y-%m-%d %H:%M")} (JST)</div>
 <div class="content">{result_text}</div>
 </body>
 </html>"""
             st.download_button(
-                "📄 HTMLでダウンロード",
+                "HTML でダウンロード",
                 data=html_content.encode("utf-8"),
                 file_name=f"summary_{now_str}.html",
                 mime="text/html",
@@ -1696,7 +1861,7 @@ with tab_summary:
             )
 
         # ── 再実行ボタン ──
-        if st.button("🔄 別のスタイルで再実行", key="btn_summary_retry"):
+        if st.button("別のスタイルで再実行", key="btn_summary_retry"):
             del st.session_state["summary_result"]
             st.rerun()
 
@@ -1705,14 +1870,14 @@ with tab_summary:
 # タブ⑦：ダイジェスト＆プレゼン作成
 # =====================================
 with tab_digest:
-    st.markdown('<p class="section-title">🗂️ ダイジェスト＆プレゼン資料作成</p>', unsafe_allow_html=True)
-    st.caption("複数の資料（PDF・Word・テキスト）を読み込み、AIがダイジェスト化してPowerPoint・Excelに変換します。")
+    st.markdown('<p class="section-title">ダイジェスト & プレゼン資料作成</p>', unsafe_allow_html=True)
+    st.caption("複数の資料（PDF・Word・テキスト）を読み込み、AI がダイジェスト化して PowerPoint・Excel に変換します。")
 
     if not api_key:
-        st.warning("⚠️ サイドバーにAPIキーを入力してください。")
+        st.warning("サイドバーに API キーを入力してください。")
 
     # ── ファイルアップロード ──
-    st.markdown("#### 📂 資料をアップロード")
+    st.markdown("#### ファイルをアップロード")
     st.caption("PDF・Word（.docx）・テキスト（.txt）に対応。複数ファイルを同時にアップロードできます。")
 
     uploaded_files = st.file_uploader(
@@ -1722,8 +1887,7 @@ with tab_digest:
         key="digest_files",
     )
 
-    # テキスト直接入力（追加資料として使用可）
-    with st.expander("✏️ テキストを直接追加する（任意）", expanded=False):
+    with st.expander("テキストを直接追加する（任意）", expanded=False):
         extra_text = st.text_area(
             "追加テキスト（ファイルと合わせて分析されます）",
             height=150,
@@ -1734,7 +1898,7 @@ with tab_digest:
     st.markdown("---")
 
     # ── 設定 ──
-    st.markdown("#### ⚙️ プレゼン設定")
+    st.markdown("#### プレゼン設定")
     col_d1, col_d2, col_d3 = st.columns(3)
     with col_d1:
         num_slides = st.slider("スライド枚数（タイトル・まとめ含む）", 4, 15, 8, key="digest_slides")
@@ -1759,13 +1923,13 @@ with tab_digest:
     )
 
     # ── 実行ボタン ──
-    run_digest = st.button("🚀 ダイジェスト＆資料作成を開始", type="primary", key="btn_digest")
+    run_digest = st.button("ダイジェスト & 資料作成を開始", type="primary", key="btn_digest")
 
     if run_digest:
         if not api_key:
-            st.error("⚠️ サイドバーにAPIキーを入力してください。")
+            st.error("サイドバーに API キーを入力してください。")
         elif not uploaded_files and not extra_text.strip():
-            st.warning("⚠️ ファイルをアップロードするか、テキストを入力してください。")
+            st.warning("ファイルをアップロードするか、テキストを入力してください。")
         else:
             from digest_creator import extract_text_from_file, generate_digest, create_pptx, create_xlsx
 
@@ -1792,10 +1956,10 @@ with tab_digest:
                 st.error("テキストを抽出できたファイルがありません。")
             else:
                 # 読み込み結果を表示
-                st.success(f"✅ {len(texts)}件の資料を読み込みました。")
+                st.success(f"{len(texts)}件の資料を読み込みました。")
                 with st.expander("読み込んだ資料の確認", expanded=False):
                     for fname, text in texts.items():
-                        st.markdown(f"**📄 {fname}**（{len(text):,}文字）")
+                        st.markdown(f"**{fname}**（{len(text):,}文字）")
                         st.text(text[:300] + ("..." if len(text) > 300 else ""))
                         st.markdown("---")
 
@@ -1817,7 +1981,7 @@ with tab_digest:
 
                     st.session_state["digest_result"] = digest
                     st.session_state["digest_texts"]  = texts
-                    st.success("✅ ダイジェスト生成完了！")
+                    st.success("ダイジェスト生成完了！")
 
     # ── 結果表示 & ダウンロード ──
     if "digest_result" in st.session_state:
@@ -1825,20 +1989,20 @@ with tab_digest:
         texts  = st.session_state.get("digest_texts", {})
 
         st.markdown("---")
-        st.markdown("#### 📋 ダイジェスト概要")
+        st.markdown("#### ダイジェスト概要")
 
         # 全体概要
         st.markdown(
             f'''<div style="background:white;border:1px solid #e0e7ff;border-left:4px solid #6366f1;
             border-radius:12px;padding:20px 24px;margin:8px 0;font-size:14px;
             line-height:1.8;color:#1e293b;">
-            <b>📌 全体概要</b><br><br>{digest.get("overview","").replace(chr(10),"<br>")}
+            <b>全体概要</b><br><br>{digest.get("overview","").replace(chr(10),"<br>")}
             </div>''',
             unsafe_allow_html=True,
         )
 
         # スライド構成プレビュー
-        st.markdown("#### 🖼️ スライド構成プレビュー")
+        st.markdown("#### スライド構成プレビュー")
         slides = digest.get("slides", [])
         cols_per_row = 3
         for row_start in range(0, len(slides), cols_per_row):
@@ -1846,7 +2010,7 @@ with tab_digest:
             cols = st.columns(len(row_slides))
             for col, sd in zip(cols, row_slides):
                 with col:
-                    layout_icon = {"bullets": "📝", "two_col": "⬛⬛", "big_number": "🔢", "summary": "✅"}.get(sd.get("layout",""), "📝")
+                    layout_icon = {"bullets": "[ ]", "two_col": "[ ][ ]", "big_number": "[N]", "summary": "[v]"}.get(sd.get("layout",""), "")
                     st.markdown(
                         f'''<div style="background:white;border:1px solid #e0e7ff;border-radius:10px;
                         padding:12px 14px;margin-bottom:8px;min-height:120px;">
@@ -1860,9 +2024,8 @@ with tab_digest:
                         unsafe_allow_html=True,
                     )
 
-        # ── ダウンロード ──
         st.markdown("---")
-        st.markdown("#### 💾 資料をダウンロード")
+        st.markdown("#### ダウンロード")
         now_str = datetime.datetime.now(JST).strftime("%Y%m%d_%H%M%S")
         output_format = st.session_state.get("digest_format", "両方")
 
@@ -1875,7 +2038,7 @@ with tab_digest:
                     pptx_bytes = create_pptx(digest)
                     with dl_cols[0]:
                         st.download_button(
-                            "📥 PowerPoint（.pptx）をダウンロード",
+                            "PowerPoint（.pptx）をダウンロード",
                             data=pptx_bytes,
                             file_name=f"digest_{now_str}.pptx",
                             mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
@@ -1892,7 +2055,7 @@ with tab_digest:
                     xlsx_bytes = create_xlsx(digest, texts)
                     with dl_cols[1]:
                         st.download_button(
-                            "📥 Excel（.xlsx）をダウンロード",
+                            "Excel（.xlsx）をダウンロード",
                             data=xlsx_bytes,
                             file_name=f"digest_{now_str}.xlsx",
                             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -1902,44 +2065,44 @@ with tab_digest:
                     st.error(f"Excel生成エラー: {e}")
 
         # ── やり直しボタン ──
-        if st.button("🔄 別の設定で作り直す", key="btn_digest_retry"):
+        if st.button("別の設定で作り直す", key="btn_digest_retry"):
             del st.session_state["digest_result"]
             del st.session_state["digest_texts"]
             st.rerun()
 
 with tab_history:
-    st.markdown('<p class="section-title">🗄️ 分析履歴</p>', unsafe_allow_html=True)
+    st.markdown('<p class="section-title">分析履歴</p>', unsafe_allow_html=True)
     sessions = get_all_sessions()
     if not sessions:
         show_empty_state("🗄️","まだ分析履歴がありません",
-            "「🔍 キーワード分析」タブで分析すると、結果が自動的に保存されます。")
+            "「キーワード分析」タブで分析すると、結果が自動的に保存されます。")
     else:
         st.markdown(f"**保存済みセッション数：{len(sessions)}件**")
         st.markdown("---")
         for s in sessions:
             col_info,col_btn1,col_btn2 = st.columns([4,1,1])
             with col_info:
-                memo_text = f"　📝 {s['memo']}" if s.get("memo") else ""
+                memo_text = f"　{s['memo']}" if s.get("memo") else ""
                 st.markdown(
                     f'<div class="history-card">'
-                    f'<div><div class="history-date">🕐 {s["created_at"]}{memo_text}</div></div>'
-                    f'<div class="history-count">📊 {s["kw_count"]}件のキーワード</div>'
+                    f'<div><div class="history-date">{s["created_at"]}{memo_text}</div></div>'
+                    f'<div class="history-count">{s["kw_count"]} キーワード</div>'
                     f'</div>', unsafe_allow_html=True)
             with col_btn1:
                 st.markdown("<br>", unsafe_allow_html=True)
-                if st.button("📂 表示",key=f"show_{s['id']}",use_container_width=True):
+                if st.button("表示",key=f"show_{s['id']}",use_container_width=True):
                     loaded = get_session_results(s["id"])
                     st.session_state["results"] = loaded
                     st.session_state["loaded_session_id"] = s["id"]
                     st.rerun()
             with col_btn2:
                 st.markdown("<br>", unsafe_allow_html=True)
-                if st.button("🗑️ 削除",key=f"del_{s['id']}",use_container_width=True):
+                if st.button("削除",key=f"del_{s['id']}",use_container_width=True):
                     delete_session(s["id"])
                     st.warning(f"セッション {s['id']} を削除しました。")
                     st.rerun()
         st.markdown("---")
-        st.markdown('<p class="section-title">📈 キーワード別 推移を確認</p>', unsafe_allow_html=True)
+        st.markdown('<p class="section-title">キーワード別 推移を確認</p>', unsafe_allow_html=True)
         all_kws = get_all_keywords()
         if all_kws:
             selected_kw = st.selectbox("推移を見たいキーワードを選択", options=all_kws)
@@ -1948,22 +2111,22 @@ with tab_history:
                 if len(history) >= 2:
                     st.plotly_chart(make_history_line_chart(history,selected_kw), use_container_width=True)
                     diff = history[-1]["purchase_score"] - history[0]["purchase_score"]
-                    if diff > 0:   st.success(f"📈 初回分析から **+{diff}点** 上昇しています。")
-                    elif diff < 0: st.warning(f"📉 初回分析から **{diff}点** 下降しています。")
-                    else:          st.info("➡️ スコアに変化はありません。")
+                    if diff > 0:   st.success(f"初回分析から **+{diff}点** 上昇しています。")
+                    elif diff < 0: st.warning(f"初回分析から **{diff}点** 下降しています。")
+                    else:          st.info("スコアに変化はありません。")
                 else:
                     st.info(f"「{selected_kw}」はまだ1回しか分析されていません。")
         else:
             st.info("保存済みのキーワードがありません。")
         st.markdown("---")
-        st.markdown('<p class="section-title">📊 全履歴サマリー</p>', unsafe_allow_html=True)
+        st.markdown('<p class="section-title">全履歴サマリー</p>', unsafe_allow_html=True)
         stats = get_segment_stats()
         if stats:
             stat_rows = []
             for seg,data in stats.items():
                 info = SEGMENT_INFO.get(seg,{})
                 stat_rows.append({
-                    "価格帯層":     f"{info.get('emoji','')} {seg}",
+                    "価格帯層":     f"{seg}",
                     "分析件数":     f"{data['count']}件",
                     "平均購買意欲": f"{data['avg_score']:.1f}/10",
                     "推奨戦略":     info.get("strategy",""),
@@ -1975,57 +2138,57 @@ with tab_history:
 # タブ⑦：使い方ガイド
 # =====================================
 with tab_guide:
-    st.markdown('<p class="section-title">📖 使い方ガイド</p>', unsafe_allow_html=True)
+    st.markdown('<p class="section-title">使い方ガイド</p>', unsafe_allow_html=True)
     st.markdown("""
-### 🔍 キーワード分析タブ
+### キーワード分析タブ
 1行1つ・最大20件まで分析できます。業種を入力すると精度が上がります。
 
 ---
 
-### 📈 トレンド分析タブ
-Google Trendsの実データで日本市場の検索ボリューム推移を分析します。
+### トレンド分析タブ
+Google Trends の実データで日本市場の検索ボリューム推移を分析します。
 
 | できること | 説明 |
 |-----------|------|
 | 検索ボリューム推移 | 期間内の相対的な人気度を折れ線グラフで表示 |
 | 都道府県別人気度 | どの地域で最も検索されているか棒グラフで表示 |
 | 関連キーワード | 実際に一緒に検索されているワードを自動取得 |
-| 最新ニュース | Google Newsから関連ニュースをリアルタイム取得 |
-| AI市場分析 | データをもとにAIが市場動向と広告戦略を提言 |
-| 📈 トレンド予測 | 過去データから線形回帰で将来トレンドを予測（v3.0） |
-| 🟥 ヒートマップ | 曜日×時間帯の検索アクティビティを可視化（v3.0） |
-| 👥 年代別分析 | AIが各年代の関心度・購買意向を分析（v3.0） |
+| 最新ニュース | Google News から関連ニュースをリアルタイム取得 |
+| AI 市場分析 | データをもとに AI が市場動向と広告戦略を提言 |
+| トレンド予測 | 過去データから線形回帰で将来トレンドを予測 |
+| ヒートマップ | 曜日×時間帯の検索アクティビティを可視化 |
+| 年代別分析 | AI が各年代の関心度・購買意向を分析 |
 
-💡 **コツ：同じキーワードを定期的に取得すると市場の変化を追えます**
-
----
-
-### 📂 CSV分析タブ
-CSVをアップロードするだけでAIが自動分析します。
+**コツ：同じキーワードを定期的に取得すると市場の変化を追えます**
 
 ---
 
-### 📄 文章要約・整形タブ
-社内資料・報告書などをAIが自動で要約・整形します。
+### CSV 分析タブ
+CSV をアップロードするだけで AI が自動分析します。
+
+---
+
+### 文章要約・整形タブ
+社内資料・報告書などを AI が自動で要約・整形します。
 
 | できること | 説明 |
 |-----------|------|
 | テキスト直接入力 | 文章を貼り付けてすぐ要約 |
-| PDF/Wordアップロード | ファイルから自動でテキスト抽出 |
+| PDF/Word アップロード | ファイルから自動でテキスト抽出 |
 | 4つの出力スタイル | 箇条書き・短い要約・構造化・資料向け整形 |
 | 長さ調整 | 短め〜詳しくの4段階で調整可能 |
-| TXT/HTMLダウンロード | 結果をそのまま資料に活用 |
+| TXT/HTML ダウンロード | 結果をそのまま資料に活用 |
 
-💡 **コツ：「資料向け整形文章」スタイルはそのまま報告書に貼り付けられます**
+**コツ：「資料向け整形文章」スタイルはそのまま報告書に貼り付けられます**
 
 ---
 
-### 💡 価格帯別の広告戦略
+### 価格帯別の広告戦略
 
 | 価格帯 | 主な訴求軸 | キーワード例 |
 |--------|-----------|-------------|
-| 💚 Budget | コスパ・割引・最安値 | 格安・安い・お得 |
-| 💙 Standard | 機能・信頼性・実績 | おすすめ・人気・比較 |
-| 💜 Premium | 品質・体験・専門性 | 高品質・こだわり・プロ |
-| 🖤 Luxury | ブランド・希少性・限定 | 高級・限定・ブランド |
+| Budget | コスパ・割引・最安値 | 格安・安い・お得 |
+| Standard | 機能・信頼性・実績 | おすすめ・人気・比較 |
+| Premium | 品質・体験・専門性 | 高品質・こだわり・プロ |
+| Luxury | ブランド・希少性・限定 | 高級・限定・ブランド |
 """)
