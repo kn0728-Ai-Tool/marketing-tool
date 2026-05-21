@@ -531,12 +531,13 @@ st.markdown("""
 # =====================================
 # タブ定義
 # =====================================
-tab_analyze, tab_result, tab_chart, tab_trend, tab_csv, tab_history, tab_guide = st.tabs([
+tab_analyze, tab_result, tab_chart, tab_trend, tab_csv, tab_summary, tab_history, tab_guide = st.tabs([
     "🔍 キーワード分析",
     "📝 分析結果",
     "📊 グラフ分析",
     "📈 トレンド分析",
     "📂 CSV分析",
+    "📄 文章要約・整形",
     "🗄️ 分析履歴",
     "📖 使い方ガイド",
 ])
@@ -1436,6 +1437,268 @@ with tab_csv:
 # =====================================
 # タブ⑥：分析履歴
 # =====================================
+
+# =====================================
+# タブ⑥：文章要約・整形
+# =====================================
+with tab_summary:
+    st.markdown('<p class="section-title">📄 文章要約・整形</p>', unsafe_allow_html=True)
+    st.caption("社内資料・報告書などの文章をAIが読みやすく要約・整形します。テキスト入力またはPDF/Wordファイルのアップロードに対応しています。")
+
+    if not api_key:
+        st.warning("⚠️ サイドバーにAPIキーを入力してください。")
+
+    # ── 入力方法の選択 ──
+    input_method = st.radio(
+        "入力方法を選択",
+        ["📝 テキストを直接入力", "📎 ファイルをアップロード（PDF / Word）"],
+        horizontal=True,
+        key="summary_input_method",
+    )
+
+    raw_text = ""
+
+    if input_method == "📝 テキストを直接入力":
+        raw_text = st.text_area(
+            "要約・整形したい文章を貼り付けてください",
+            height=240,
+            placeholder="ここに文章を入力してください...",
+            key="summary_text_input",
+        )
+
+    else:
+        uploaded_doc = st.file_uploader(
+            "PDF または Word（.docx）ファイルをアップロード",
+            type=["pdf", "docx"],
+            key="summary_file_upload",
+        )
+        if uploaded_doc is not None:
+            file_ext = uploaded_doc.name.split(".")[-1].lower()
+            with st.spinner("ファイルを読み込み中..."):
+                try:
+                    if file_ext == "pdf":
+                        import io
+                        try:
+                            import pypdf
+                            reader = pypdf.PdfReader(io.BytesIO(uploaded_doc.read()))
+                            raw_text = "\n".join(
+                                page.extract_text() or "" for page in reader.pages
+                            )
+                        except ImportError:
+                            try:
+                                import PyPDF2
+                                reader = PyPDF2.PdfReader(io.BytesIO(uploaded_doc.read()))
+                                raw_text = "\n".join(
+                                    page.extract_text() or "" for page in reader.pages
+                                )
+                            except ImportError:
+                                st.error("PDFの読み込みに pypdf が必要です。requirements.txt に pypdf を追加してください。")
+
+                    elif file_ext == "docx":
+                        import io
+                        try:
+                            import docx
+                            doc_obj = docx.Document(io.BytesIO(uploaded_doc.read()))
+                            raw_text = "\n".join(p.text for p in doc_obj.paragraphs if p.text.strip())
+                        except ImportError:
+                            st.error("Wordファイルの読み込みに python-docx が必要です。requirements.txt に python-docx を追加してください。")
+
+                    if raw_text:
+                        st.success(f"✅ ファイル読み込み完了（{len(raw_text)}文字）")
+                        with st.expander("読み込んだテキストを確認", expanded=False):
+                            st.text(raw_text[:2000] + ("..." if len(raw_text) > 2000 else ""))
+                    else:
+                        st.warning("テキストを抽出できませんでした。別のファイルをお試しください。")
+
+                except Exception as e:
+                    st.error(f"ファイルの読み込みに失敗しました: {e}")
+
+    st.markdown("---")
+
+    # ── 要約設定 ──
+    st.markdown("#### ⚙️ 要約設定")
+    col_s1, col_s2 = st.columns(2)
+
+    with col_s1:
+        summary_style = st.selectbox(
+            "出力スタイル",
+            options=[
+                "箇条書きで要点整理",
+                "短い要約文（3〜5行）",
+                "見出し付きの構造化サマリー",
+                "資料向け整形文章",
+            ],
+            key="summary_style",
+        )
+
+    with col_s2:
+        summary_length = st.select_slider(
+            "要約の長さ",
+            options=["短め（150字程度）", "標準（300字程度）", "詳細（500字程度）", "詳しく（800字程度）"],
+            value="標準（300字程度）",
+            key="summary_length",
+        )
+
+    length_map = {
+        "短め（150字程度）":  "150字程度",
+        "標準（300字程度）":  "300字程度",
+        "詳細（500字程度）":  "500字程度",
+        "詳しく（800字程度）": "800字程度",
+    }
+    length_tokens_map = {
+        "短め（150字程度）":  400,
+        "標準（300字程度）":  700,
+        "詳細（500字程度）":  1000,
+        "詳しく（800字程度）": 1500,
+    }
+
+    # ── 実行ボタン ──
+    run_summary = st.button("✨ 要約・整形を実行", type="primary", key="btn_summary")
+
+    if run_summary:
+        if not api_key:
+            st.error("⚠️ サイドバーにAPIキーを入力してください。")
+        elif not raw_text.strip():
+            st.warning("⚠️ 文章を入力またはファイルをアップロードしてください。")
+        else:
+            # 文字数が多すぎる場合は先頭8000文字に制限
+            text_to_summarize = raw_text.strip()
+            if len(text_to_summarize) > 8000:
+                text_to_summarize = text_to_summarize[:8000]
+                st.info("📌 文章が長いため、先頭8000文字を対象に要約します。")
+
+            length_str = length_map[summary_length]
+            max_tok    = length_tokens_map[summary_length]
+
+            style_prompts = {
+                "箇条書きで要点整理": f"""
+以下の文章を箇条書きで要点を整理してください。
+- 重要なポイントを5〜10個の箇条書きにまとめてください
+- 各項目は1〜2文で簡潔に記述してください
+- 合計{length_str}を目安にしてください
+- 日本語で出力してください
+""",
+                "短い要約文（3〜5行）": f"""
+以下の文章を短い要約文にまとめてください。
+- 3〜5行の簡潔な要約文を作成してください
+- 最も重要な内容を優先して記述してください
+- {length_str}を目安にしてください
+- 日本語で自然な文章として出力してください
+""",
+                "見出し付きの構造化サマリー": f"""
+以下の文章を見出し付きの構造化サマリーにまとめてください。
+- 2〜4つのセクションに分け、各セクションに見出しをつけてください
+- 各セクションの内容を2〜3文で記述してください
+- 全体で{length_str}を目安にしてください
+- 日本語で出力し、見出しは【】で囲んでください
+""",
+                "資料向け整形文章": f"""
+以下の文章を、社内資料や報告書にそのまま使える整形された文章にまとめてください。
+- 読みやすく、論理的な構成で書き直してください
+- 冗長な表現を省き、簡潔で明確な表現に整えてください
+- 全体で{length_str}を目安にしてください
+- 敬語・丁寧語を使用し、ビジネス文書として適切なトーンにしてください
+""",
+            }
+
+            prompt = f"""{style_prompts[summary_style]}
+
+【対象文章】
+{text_to_summarize}
+"""
+            with st.spinner("AIが要約・整形中...（数秒かかります）"):
+                try:
+                    from openai import OpenAI as _OA
+                    _client = _OA(api_key=api_key)
+                    _resp   = _client.chat.completions.create(
+                        model="gpt-4o-mini",
+                        messages=[
+                            {"role": "system", "content": "あなたは日本語文章の要約・整形の専門家です。指示に従い、正確で読みやすい出力を生成してください。"},
+                            {"role": "user",   "content": prompt},
+                        ],
+                        temperature=0.3,
+                        max_tokens=max_tok,
+                    )
+                    summary_result = _resp.choices[0].message.content.strip()
+                    st.session_state["summary_result"] = summary_result
+                    st.session_state["summary_style_used"]  = summary_style
+                    st.session_state["summary_length_used"] = summary_length
+
+                except Exception as e:
+                    st.error(f"要約中にエラーが発生しました: {e}")
+
+    # ── 結果表示 ──
+    if "summary_result" in st.session_state:
+        st.markdown("---")
+        st.markdown("#### 📋 要約・整形結果")
+
+        style_used  = st.session_state.get("summary_style_used", "")
+        length_used = st.session_state.get("summary_length_used", "")
+
+        col_badge1, col_badge2 = st.columns([1, 3])
+        with col_badge1:
+            st.markdown(f'<span class="meta-chip">📌 {style_used}</span>', unsafe_allow_html=True)
+        with col_badge2:
+            st.markdown(f'<span class="meta-chip">📏 {length_used}</span>', unsafe_allow_html=True)
+
+        result_text = st.session_state["summary_result"]
+
+        st.markdown(
+            f'''<div style="background:white;border:1px solid #e0e7ff;border-left:4px solid #6366f1;
+            border-radius:12px;padding:24px 28px;margin:12px 0;
+            font-size:14px;line-height:1.9;color:#1e293b;
+            box-shadow:0 2px 12px rgba(99,102,241,0.08);">
+            {result_text.replace(chr(10), "<br>")}
+            </div>''',
+            unsafe_allow_html=True,
+        )
+
+        # ── ダウンロードボタン ──
+        st.markdown("#### 💾 結果をダウンロード")
+        now_str = datetime.datetime.now(JST).strftime("%Y%m%d_%H%M%S")
+
+        dl_col1, dl_col2 = st.columns(2)
+        with dl_col1:
+            st.download_button(
+                "📥 TXTでダウンロード",
+                data=result_text.encode("utf-8"),
+                file_name=f"summary_{now_str}.txt",
+                mime="text/plain",
+                use_container_width=True,
+            )
+        with dl_col2:
+            html_content = f"""<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>要約・整形結果</title>
+<style>
+  body {{ font-family: 'Hiragino Sans', 'Yu Gothic UI', sans-serif; max-width:800px; margin:40px auto; padding:0 20px; color:#1e293b; line-height:1.9; }}
+  h1   {{ font-size:20px; color:#6366f1; border-bottom:2px solid #6366f1; padding-bottom:8px; }}
+  .meta {{ font-size:12px; color:#64748b; margin-bottom:24px; }}
+  .content {{ background:#fafafe; border:1px solid #e0e7ff; border-left:4px solid #6366f1; border-radius:8px; padding:24px; white-space:pre-wrap; font-size:14px; }}
+</style>
+</head>
+<body>
+<h1>📄 要約・整形結果</h1>
+<div class="meta">スタイル: {style_used}　|　長さ: {length_used}　|　作成日時: {datetime.datetime.now(JST).strftime("%Y-%m-%d %H:%M")} (JST)</div>
+<div class="content">{result_text}</div>
+</body>
+</html>"""
+            st.download_button(
+                "📄 HTMLでダウンロード",
+                data=html_content.encode("utf-8"),
+                file_name=f"summary_{now_str}.html",
+                mime="text/html",
+                use_container_width=True,
+            )
+
+        # ── 再実行ボタン ──
+        if st.button("🔄 別のスタイルで再実行", key="btn_summary_retry"):
+            del st.session_state["summary_result"]
+            st.rerun()
+
 with tab_history:
     st.markdown('<p class="section-title">🗄️ 分析履歴</p>', unsafe_allow_html=True)
     sessions = get_all_sessions()
@@ -1531,6 +1794,21 @@ Google Trendsの実データで日本市場の検索ボリューム推移を分�
 
 ### 📂 CSV分析タブ
 CSVをアップロードするだけでAIが自動分析します。
+
+---
+
+### 📄 文章要約・整形タブ
+社内資料・報告書などをAIが自動で要約・整形します。
+
+| できること | 説明 |
+|-----------|------|
+| テキスト直接入力 | 文章を貼り付けてすぐ要約 |
+| PDF/Wordアップロード | ファイルから自動でテキスト抽出 |
+| 4つの出力スタイル | 箇条書き・短い要約・構造化・資料向け整形 |
+| 長さ調整 | 短め〜詳しくの4段階で調整可能 |
+| TXT/HTMLダウンロード | 結果をそのまま資料に活用 |
+
+💡 **コツ：「資料向け整形文章」スタイルはそのまま報告書に貼り付けられます**
 
 ---
 
