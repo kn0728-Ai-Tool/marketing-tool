@@ -94,6 +94,9 @@ html, body, [class*="css"] {
   gap: 2px;
   border-bottom: 1px solid #e2e8f0;
   background: transparent;
+  /* スクロール可能にする（ボタン表示に必要） */
+  overflow-x: auto !important;
+  padding-bottom: 1px;
 }
 .stTabs [data-baseweb="tab"] {
   border-radius: 6px 6px 0 0;
@@ -105,6 +108,7 @@ html, body, [class*="css"] {
   border: 1px solid #e2e8f0;
   border-bottom: none;
   transition: all 0.15s;
+  white-space: nowrap;
 }
 .stTabs [data-baseweb="tab"]:hover {
   color: #4338ca;
@@ -115,6 +119,73 @@ html, body, [class*="css"] {
   color: #4338ca !important;
   border-color: #e2e8f0 !important;
   box-shadow: 0 -2px 0 #4338ca inset;
+}
+
+/* ─── タブ スクロールボタン（◀ ▶）─── */
+/* 左スクロールボタン */
+.stTabs [data-baseweb="tab-list"] ~ div > button:first-child,
+[data-baseweb="tab-list"] + div button:first-of-type,
+button[aria-label="scroll tab list left"],
+button[data-testid="baseui-scroll-left-arrow"] {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  width: 40px !important;
+  height: 40px !important;
+  min-width: 40px !important;
+  border-radius: 8px !important;
+  background: #4338ca !important;
+  border: 2px solid #4338ca !important;
+  color: white !important;
+  font-size: 18px !important;
+  font-weight: 900 !important;
+  cursor: pointer !important;
+  box-shadow: 0 2px 8px rgba(67,56,202,0.35) !important;
+  transition: all 0.15s !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+/* 右スクロールボタン */
+button[aria-label="scroll tab list right"],
+button[data-testid="baseui-scroll-right-arrow"] {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  width: 40px !important;
+  height: 40px !important;
+  min-width: 40px !important;
+  border-radius: 8px !important;
+  background: #4338ca !important;
+  border: 2px solid #4338ca !important;
+  color: white !important;
+  font-size: 18px !important;
+  font-weight: 900 !important;
+  cursor: pointer !important;
+  box-shadow: 0 2px 8px rgba(67,56,202,0.35) !important;
+  transition: all 0.15s !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+/* ホバー時：少し明るく */
+button[aria-label="scroll tab list left"]:hover,
+button[aria-label="scroll tab list right"]:hover,
+button[data-testid="baseui-scroll-left-arrow"]:hover,
+button[data-testid="baseui-scroll-right-arrow"]:hover {
+  background: #3730a3 !important;
+  box-shadow: 0 4px 14px rgba(67,56,202,0.5) !important;
+  transform: scale(1.08) !important;
+}
+/* 無効時（端まで来た時）：グレーアウト */
+button[aria-label="scroll tab list left"]:disabled,
+button[aria-label="scroll tab list right"]:disabled,
+button[data-testid="baseui-scroll-left-arrow"]:disabled,
+button[data-testid="baseui-scroll-right-arrow"]:disabled {
+  background: #e2e8f0 !important;
+  border-color: #e2e8f0 !important;
+  color: #94a3b8 !important;
+  box-shadow: none !important;
+  transform: none !important;
+  cursor: default !important;
 }
 
 /* ─── メトリクスカード ─── */
