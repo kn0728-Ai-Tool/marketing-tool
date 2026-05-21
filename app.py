@@ -531,13 +531,14 @@ st.markdown("""
 # =====================================
 # タブ定義
 # =====================================
-tab_analyze, tab_result, tab_chart, tab_trend, tab_csv, tab_summary, tab_history, tab_guide = st.tabs([
+tab_analyze, tab_result, tab_chart, tab_trend, tab_csv, tab_summary, tab_digest, tab_history, tab_guide = st.tabs([
     "🔍 キーワード分析",
     "📝 分析結果",
     "📊 グラフ分析",
     "📈 トレンド分析",
     "📂 CSV分析",
     "📄 文章要約・整形",
+    "🗂️ ダイジェスト＆プレゼン",
     "🗄️ 分析履歴",
     "📖 使い方ガイド",
 ])
@@ -1697,6 +1698,213 @@ with tab_summary:
         # ── 再実行ボタン ──
         if st.button("🔄 別のスタイルで再実行", key="btn_summary_retry"):
             del st.session_state["summary_result"]
+            st.rerun()
+
+
+# =====================================
+# タブ⑦：ダイジェスト＆プレゼン作成
+# =====================================
+with tab_digest:
+    st.markdown('<p class="section-title">🗂️ ダイジェスト＆プレゼン資料作成</p>', unsafe_allow_html=True)
+    st.caption("複数の資料（PDF・Word・テキスト）を読み込み、AIがダイジェスト化してPowerPoint・Excelに変換します。")
+
+    if not api_key:
+        st.warning("⚠️ サイドバーにAPIキーを入力してください。")
+
+    # ── ファイルアップロード ──
+    st.markdown("#### 📂 資料をアップロード")
+    st.caption("PDF・Word（.docx）・テキスト（.txt）に対応。複数ファイルを同時にアップロードできます。")
+
+    uploaded_files = st.file_uploader(
+        "資料ファイルをアップロード（複数可）",
+        type=["pdf", "docx", "txt", "text", "md"],
+        accept_multiple_files=True,
+        key="digest_files",
+    )
+
+    # テキスト直接入力（追加資料として使用可）
+    with st.expander("✏️ テキストを直接追加する（任意）", expanded=False):
+        extra_text = st.text_area(
+            "追加テキスト（ファイルと合わせて分析されます）",
+            height=150,
+            placeholder="議事録・メモなどをここに貼り付けてください...",
+            key="digest_extra_text",
+        )
+
+    st.markdown("---")
+
+    # ── 設定 ──
+    st.markdown("#### ⚙️ プレゼン設定")
+    col_d1, col_d2, col_d3 = st.columns(3)
+    with col_d1:
+        num_slides = st.slider("スライド枚数（タイトル・まとめ含む）", 4, 15, 8, key="digest_slides")
+    with col_d2:
+        detail_level = st.select_slider(
+            "要約の詳しさ",
+            options=["簡潔", "標準", "詳細"],
+            value="標準",
+            key="digest_detail",
+        )
+    with col_d3:
+        output_format = st.radio(
+            "出力形式",
+            ["PowerPoint（.pptx）", "Excel（.xlsx）", "両方"],
+            key="digest_format",
+        )
+
+    pptx_title = st.text_input(
+        "プレゼンタイトル（空白の場合はAIが自動生成）",
+        placeholder="例：2024年度 第3四半期 市場動向レポート",
+        key="digest_title",
+    )
+
+    # ── 実行ボタン ──
+    run_digest = st.button("🚀 ダイジェスト＆資料作成を開始", type="primary", key="btn_digest")
+
+    if run_digest:
+        if not api_key:
+            st.error("⚠️ サイドバーにAPIキーを入力してください。")
+        elif not uploaded_files and not extra_text.strip():
+            st.warning("⚠️ ファイルをアップロードするか、テキストを入力してください。")
+        else:
+            from digest_creator import extract_text_from_file, generate_digest, create_pptx, create_xlsx
+
+            # ── テキスト抽出 ──
+            texts = {}
+            errors = []
+
+            with st.spinner("ファイルを読み込み中..."):
+                for f in uploaded_files:
+                    text, err = extract_text_from_file(f)
+                    if err:
+                        errors.append(err)
+                    elif text:
+                        texts[f.name] = text
+
+                if extra_text.strip():
+                    texts["直接入力テキスト"] = extra_text.strip()
+
+            if errors:
+                for err in errors:
+                    st.error(err)
+
+            if not texts:
+                st.error("テキストを抽出できたファイルがありません。")
+            else:
+                # 読み込み結果を表示
+                st.success(f"✅ {len(texts)}件の資料を読み込みました。")
+                with st.expander("読み込んだ資料の確認", expanded=False):
+                    for fname, text in texts.items():
+                        st.markdown(f"**📄 {fname}**（{len(text):,}文字）")
+                        st.text(text[:300] + ("..." if len(text) > 300 else ""))
+                        st.markdown("---")
+
+                # ── AI ダイジェスト生成 ──
+                with st.spinner("AIが複数資料を横断してダイジェスト化中...（20〜40秒かかります）"):
+                    digest = generate_digest(
+                        texts=texts,
+                        api_key=api_key,
+                        num_slides=num_slides,
+                        detail_level=detail_level,
+                    )
+
+                if "error" in digest:
+                    st.error(f"ダイジェスト生成エラー: {digest['error']}")
+                else:
+                    # タイトルを上書き
+                    if pptx_title.strip():
+                        digest["title"] = pptx_title.strip()
+
+                    st.session_state["digest_result"] = digest
+                    st.session_state["digest_texts"]  = texts
+                    st.success("✅ ダイジェスト生成完了！")
+
+    # ── 結果表示 & ダウンロード ──
+    if "digest_result" in st.session_state:
+        digest = st.session_state["digest_result"]
+        texts  = st.session_state.get("digest_texts", {})
+
+        st.markdown("---")
+        st.markdown("#### 📋 ダイジェスト概要")
+
+        # 全体概要
+        st.markdown(
+            f'''<div style="background:white;border:1px solid #e0e7ff;border-left:4px solid #6366f1;
+            border-radius:12px;padding:20px 24px;margin:8px 0;font-size:14px;
+            line-height:1.8;color:#1e293b;">
+            <b>📌 全体概要</b><br><br>{digest.get("overview","").replace(chr(10),"<br>")}
+            </div>''',
+            unsafe_allow_html=True,
+        )
+
+        # スライド構成プレビュー
+        st.markdown("#### 🖼️ スライド構成プレビュー")
+        slides = digest.get("slides", [])
+        cols_per_row = 3
+        for row_start in range(0, len(slides), cols_per_row):
+            row_slides = slides[row_start:row_start + cols_per_row]
+            cols = st.columns(len(row_slides))
+            for col, sd in zip(cols, row_slides):
+                with col:
+                    layout_icon = {"bullets": "📝", "two_col": "⬛⬛", "big_number": "🔢", "summary": "✅"}.get(sd.get("layout",""), "📝")
+                    st.markdown(
+                        f'''<div style="background:white;border:1px solid #e0e7ff;border-radius:10px;
+                        padding:12px 14px;margin-bottom:8px;min-height:120px;">
+                        <div style="font-size:11px;color:#6366f1;font-weight:700;margin-bottom:4px;">
+                        スライド {sd["slide_num"]} {layout_icon}</div>
+                        <div style="font-size:13px;font-weight:700;color:#1e293b;margin-bottom:8px;">
+                        {sd.get("title","")}</div>
+                        <div style="font-size:11px;color:#475569;">
+                        {"<br>".join(f"▶ {b}" for b in sd.get("bullets",[])[:3])}</div>
+                        </div>''',
+                        unsafe_allow_html=True,
+                    )
+
+        # ── ダウンロード ──
+        st.markdown("---")
+        st.markdown("#### 💾 資料をダウンロード")
+        now_str = datetime.datetime.now(JST).strftime("%Y%m%d_%H%M%S")
+        output_format = st.session_state.get("digest_format", "両方")
+
+        dl_cols = st.columns(2)
+
+        if output_format in ["PowerPoint（.pptx）", "両方"]:
+            with st.spinner("PowerPointを生成中..."):
+                try:
+                    from digest_creator import create_pptx
+                    pptx_bytes = create_pptx(digest)
+                    with dl_cols[0]:
+                        st.download_button(
+                            "📥 PowerPoint（.pptx）をダウンロード",
+                            data=pptx_bytes,
+                            file_name=f"digest_{now_str}.pptx",
+                            mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                            use_container_width=True,
+                            type="primary",
+                        )
+                except Exception as e:
+                    st.error(f"PowerPoint生成エラー: {e}")
+
+        if output_format in ["Excel（.xlsx）", "両方"]:
+            with st.spinner("Excelを生成中..."):
+                try:
+                    from digest_creator import create_xlsx
+                    xlsx_bytes = create_xlsx(digest, texts)
+                    with dl_cols[1]:
+                        st.download_button(
+                            "📥 Excel（.xlsx）をダウンロード",
+                            data=xlsx_bytes,
+                            file_name=f"digest_{now_str}.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            use_container_width=True,
+                        )
+                except Exception as e:
+                    st.error(f"Excel生成エラー: {e}")
+
+        # ── やり直しボタン ──
+        if st.button("🔄 別の設定で作り直す", key="btn_digest_retry"):
+            del st.session_state["digest_result"]
+            del st.session_state["digest_texts"]
             st.rerun()
 
 with tab_history:
