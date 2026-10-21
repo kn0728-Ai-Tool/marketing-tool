@@ -1,0 +1,14 @@
+# APIキー（絶対にGitHubへ上げない）
+.streamlit/secrets.toml
+.env
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# ローカルDB・一時ファイル
+*.db
+.DS_Store
+Thumbs.db

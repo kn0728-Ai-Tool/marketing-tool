@@ -383,9 +383,19 @@ CHART_COLORS = [
     {"line": "#8b5cf6", "fill": "rgba(139,92,246,0.05)"},
 ]
 
+# APIキーの読み込み順：
+#   1. Streamlit Cloud の Secrets（.streamlit/secrets.toml）
+#   2. 環境変数 OPENAI_API_KEY（Claude Code・ローカル実行用）
+#   どちらも無ければサイドバーで手入力
 api_key = ""
-if hasattr(st, "secrets"):
+try:
     api_key = st.secrets.get("OPENAI_API_KEY", "")
+except Exception:
+    # secrets.toml が無い環境（ローカル実行時など）でもクラッシュさせない
+    api_key = ""
+if not api_key:
+    import os as _os
+    api_key = _os.environ.get("OPENAI_API_KEY", "")
 
 
 # =====================================
